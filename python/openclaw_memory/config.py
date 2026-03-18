@@ -19,7 +19,7 @@ team_members_env = os.getenv("OPENCLAW_TEAM_MEMBERS")
 if team_members_env:
     TEAM_MEMBER_IDS = tuple(id.strip() for id in team_members_env.split(",") if id.strip())
 else:
-    # Default empty team, should be populated via environment
+    # Default empty team: BrainClaw should be populated by the host environment
     TEAM_MEMBER_IDS = ()
 
 # Identity Constants (Environment-defined)
