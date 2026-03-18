@@ -91,7 +91,15 @@ export async function callPythonBackend(
 
     // 4. Secure Identity Token (BRAINCLAW V2)
     // Create a signed HMAC token to prevent identity spoofing in the Python backend
-    const brainclawSecret = config.brainclawSecret || process.env.BRAINCLAW_SECRET || 'dev-brainclaw-secret';
+    const brainclawSecret = config.brainclawSecret || process.env.BRAINCLAW_SECRET;
+    if (!brainclawSecret) {
+      throw new Error(
+        '[BrainClaw] BRAINCLAW_SECRET is required but not configured. ' +
+        'Set brainclawSecret in plugin config or the BRAINCLAW_SECRET environment variable. ' +
+        'Refusing to start with an unsigned identity token.'
+      );
+    }
+
     const agentContext = {
       agentId: ctx.agentId || 'agent-unknown',
       agentName: ctx.agentName || 'unknown',
