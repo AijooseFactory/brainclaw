@@ -1,0 +1,25 @@
+{
+  "id": "brainclaw",
+  "kind": "memory",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "postgresUrl": { "type": "string", "sensitive": true, "description": "PostgreSQL connection URL. Use ${POSTGRES_URL} env var for secrets." },
+      "weaviateUrl": { "type": "string", "sensitive": true, "description": "Weaviate connection URL. Use ${WEAVIATE_URL} for secrets." },
+      "neo4jUrl": { "type": "string", "sensitive": true, "description": "Neo4j connection URL. Use ${NEO4J_URL} for secrets." },
+      "neo4jUser": { "type": "string" },
+      "neo4jPassword": { "type": "string", "sensitive": true, "description": "Neo4j password. Use ${NEO4J_PASSWORD} for secrets." },
+      "embeddingModel": { "type": "string" },
+      "extractionModel": { "type": "string" },
+      "enableAuditLedger": { "type": "boolean", "default": true },
+      "enableCommunityDetection": { "type": "boolean", "default": true },
+      "defaultTopK": { "type": "integer", "minimum": 1, "default": 8 },
+      "pythonTimeoutMs": { "type": "integer", "default": 30000, "description": "Timeout for Python backend calls in milliseconds." },
+      "pythonPath": { "type": "string", "default": "python3", "description": "Path to Python executable. Defaults to system python3. Use ${OPENCLAW_PYTHON} for env var." },
+      "pythonBackendPath": { "type": "string", "description": "Path to openclaw-memory Python package. Required for plugin operation. Use ${OPENCLAW_PYTHON_BACKEND} for env var." }
+    },
+    "required": ["postgresUrl", "weaviateUrl", "neo4jUrl", "pythonBackendPath"]
+  },
+  "skills": ["./skills"]
+}

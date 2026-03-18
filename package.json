@@ -1,0 +1,27 @@
+{
+  "name": "brainclaw",
+  "version": "1.2.0",
+  "description": "BrainClaw: Advanced BrainClaw for OpenClaw with Hierarchical Community Detection and Immutable Audit Ledger.",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --test tests/**/*.test.js",
+    "prepublishOnly": "./scripts/bundle-python.sh",
+    "bundle": "./scripts/bundle-python.sh"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.32.15"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.37",
+    "typescript": "^5.9.3"
+  }
+}
