@@ -1,6 +1,6 @@
 # BrainClaw Plugin v1.2.1
 
-A Hybrid GraphRAG Plugin for OpenClaw
+BrainClaw is a Hybrid GraphRAG Plugin for OpenClaw and a memory and knowledge system for OpenClaw. It gives OpenClaw agents the ability to remember, learn, and retrieve context across conversations and sessions with enterprise-grade observability, auto-summarization, and active learning capabilities.
 
 ## Features
 
