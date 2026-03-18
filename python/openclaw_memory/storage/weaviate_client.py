@@ -66,6 +66,7 @@ MEMORY_CHUNK_SCHEMA = {
     "properties": [
         {"name": "memory_item_id", "dataType": ["uuid"]},
         {"name": "tenant_id", "dataType": ["uuid"]},
+        {"name": "agent_id", "dataType": ["uuid"]},
         {"name": "memory_class", "dataType": ["text"]},
         {"name": "memory_type", "dataType": ["text"]},
         {"name": "content", "dataType": ["text"]},
@@ -94,6 +95,7 @@ SUMMARY_SCHEMA = {
         {"name": "summary_id", "dataType": ["uuid"]},
         {"name": "session_id", "dataType": ["uuid"]},
         {"name": "tenant_id", "dataType": ["uuid"]},
+        {"name": "agent_id", "dataType": ["uuid"]},
         {"name": "summary_type", "dataType": ["text"]},
         {"name": "content", "dataType": ["text"]},
         {"name": "token_count", "dataType": ["int"]},
@@ -117,6 +119,7 @@ ENTITY_SCHEMA = {
         {"name": "entity_id", "dataType": ["uuid"]},
         {"name": "neo4j_id", "dataType": ["text"]},
         {"name": "tenant_id", "dataType": ["uuid"]},
+        {"name": "agent_id", "dataType": ["uuid"]},
         {"name": "entity_type", "dataType": ["text"]},
         {"name": "name", "dataType": ["text"]},
         {"name": "canonical_name", "dataType": ["text"]},
@@ -142,6 +145,7 @@ DECISION_SCHEMA = {
         {"name": "decision_id", "dataType": ["uuid"]},
         {"name": "neo4j_id", "dataType": ["text"]},
         {"name": "tenant_id", "dataType": ["uuid"]},
+        {"name": "agent_id", "dataType": ["uuid"]},
         {"name": "summary", "dataType": ["text"]},
         {"name": "decision_type", "dataType": ["text"]},
         {"name": "rationale", "dataType": ["text"]},
@@ -159,6 +163,7 @@ class MemoryChunk:
     """Memory chunk for Weaviate storage."""
     memory_item_id: Optional[uuid.UUID] = None
     tenant_id: Optional[uuid.UUID] = None
+    agent_id: Optional[uuid.UUID] = None
     memory_class: str = "semantic"
     memory_type: Optional[str] = None
     content: str = ""
@@ -170,10 +175,33 @@ class MemoryChunk:
     source_type: str = "message"
     weaviate_id: Optional[str] = None
     
+    def __post_init__(self):
+        """Initialize IDs if not provided."""
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
+
+        # Automatically set tenant_id from the verified security context if not provided
+        if self.tenant_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_tenant_id
+                current_tenant_id = get_current_tenant_id()
+                if current_tenant_id:
+                    self.tenant_id = uuid.UUID(current_tenant_id)
+            except Exception:
+                pass
+    
     def to_dict(self) -> dict:
         return {
             "memory_item_id": str(self.memory_item_id) if self.memory_item_id else None,
             "tenant_id": str(self.tenant_id) if self.tenant_id else None,
+            "agent_id": str(self.agent_id) if self.agent_id else None,
             "memory_class": self.memory_class,
             "memory_type": self.memory_type,
             "content": self.content,
@@ -192,17 +220,41 @@ class Summary:
     summary_id: Optional[uuid.UUID] = None
     session_id: Optional[uuid.UUID] = None
     tenant_id: Optional[uuid.UUID] = None
+    agent_id: Optional[uuid.UUID] = None
     summary_type: str = "session"
     content: str = ""
     token_count: int = 0
     created_at: datetime = field(default_factory=datetime.utcnow)
     weaviate_id: Optional[str] = None
     
+    def __post_init__(self):
+        """Initialize IDs if not provided."""
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
+
+        # Automatically set tenant_id from the verified security context if not provided
+        if self.tenant_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_tenant_id
+                current_tenant_id = get_current_tenant_id()
+                if current_tenant_id:
+                    self.tenant_id = uuid.UUID(current_tenant_id)
+            except Exception:
+                pass
+    
     def to_dict(self) -> dict:
         return {
             "summary_id": str(self.summary_id) if self.summary_id else None,
             "session_id": str(self.session_id) if self.session_id else None,
             "tenant_id": str(self.tenant_id) if self.tenant_id else None,
+            "agent_id": str(self.agent_id) if self.agent_id else None,
             "summary_type": self.summary_type,
             "content": self.content,
             "token_count": self.token_count,
@@ -216,6 +268,7 @@ class Entity:
     entity_id: Optional[uuid.UUID] = None
     neo4j_id: Optional[str] = None
     tenant_id: Optional[uuid.UUID] = None
+    agent_id: Optional[uuid.UUID] = None
     entity_type: str = ""
     name: str = ""
     canonical_name: Optional[str] = None
@@ -224,11 +277,34 @@ class Entity:
     confidence: float = 0.5
     weaviate_id: Optional[str] = None
     
+    def __post_init__(self):
+        """Initialize IDs if not provided."""
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
+
+        # Automatically set tenant_id from the verified security context if not provided
+        if self.tenant_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_tenant_id
+                current_tenant_id = get_current_tenant_id()
+                if current_tenant_id:
+                    self.tenant_id = uuid.UUID(current_tenant_id)
+            except Exception:
+                pass
+    
     def to_dict(self) -> dict:
         return {
             "entity_id": str(self.entity_id) if self.entity_id else None,
             "neo4j_id": self.neo4j_id,
             "tenant_id": str(self.tenant_id) if self.tenant_id else None,
+            "agent_id": str(self.agent_id) if self.agent_id else None,
             "entity_type": self.entity_type,
             "name": self.name,
             "canonical_name": self.canonical_name,
@@ -244,6 +320,7 @@ class Decision:
     decision_id: Optional[uuid.UUID] = None
     neo4j_id: Optional[str] = None
     tenant_id: Optional[uuid.UUID] = None
+    agent_id: Optional[uuid.UUID] = None
     summary: str = ""
     decision_type: str = ""
     rationale: Optional[str] = None
@@ -254,11 +331,34 @@ class Decision:
     confidence: float = 0.5
     weaviate_id: Optional[str] = None
     
+    def __post_init__(self):
+        """Initialize IDs if not provided."""
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
+
+        # Automatically set tenant_id from the verified security context if not provided
+        if self.tenant_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_tenant_id
+                current_tenant_id = get_current_tenant_id()
+                if current_tenant_id:
+                    self.tenant_id = uuid.UUID(current_tenant_id)
+            except Exception:
+                pass
+    
     def to_dict(self) -> dict:
         return {
             "decision_id": str(self.decision_id) if self.decision_id else None,
             "neo4j_id": self.neo4j_id,
             "tenant_id": str(self.tenant_id) if self.tenant_id else None,
+            "agent_id": str(self.agent_id) if self.agent_id else None,
             "summary": self.summary,
             "decision_type": self.decision_type,
             "rationale": self.rationale,
@@ -433,6 +533,7 @@ class WeaviateClient:
         query_vector: Optional[List[float]] = None,
         memory_class: Optional[str] = None,
         tenant_id: Optional[uuid.UUID] = None,
+        agent_id: Optional[uuid.UUID] = None,
         limit: int = 10,
         alpha: float = 0.7,
     ) -> List[Dict[str, Any]]:
@@ -467,6 +568,8 @@ class WeaviateClient:
                     span.set_attribute("weaviate.memory_class", memory_class)
                 if tenant_id:
                     span.set_attribute("weaviate.tenant_id", str(tenant_id))
+                if agent_id:
+                    span.set_attribute("weaviate.agent_id", str(agent_id))
             
             start_time = time.perf_counter() if _OBSERVABILITY_AVAILABLE else 0
             
@@ -474,7 +577,7 @@ class WeaviateClient:
             result = await loop.run_in_executor(
                 self._pool,
                 self._sync_search_chunks_hybrid,
-                query, query_vector, memory_class, tenant_id, limit, alpha
+                query, query_vector, memory_class, tenant_id, agent_id, limit, alpha
             )
             
             # Record metrics
@@ -503,6 +606,7 @@ class WeaviateClient:
         query_vector: Optional[List[float]],
         memory_class: Optional[str],
         tenant_id: Optional[uuid.UUID],
+        agent_id: Optional[uuid.UUID],
         limit: int,
         alpha: float,
     ) -> List[Dict[str, Any]]:
@@ -514,6 +618,8 @@ class WeaviateClient:
             filters.append(f"memory_class == '{memory_class}'")
         if tenant_id:
             filters.append(f"tenant_id == '{str(tenant_id)}'")
+        if agent_id:
+            filters.append(f"agent_id == '{str(agent_id)}'")
         
         where_filter = None
         if filters:
@@ -549,6 +655,7 @@ class WeaviateClient:
         self,
         query_vector: List[float],
         memory_class: Optional[str] = None,
+        agent_id: Optional[uuid.UUID] = None,
         limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """Near-vector search on MemoryChunk collection.
@@ -565,22 +672,39 @@ class WeaviateClient:
         return await loop.run_in_executor(
             self._pool,
             self._sync_search_chunks_near_vector,
-            query_vector, memory_class, limit
+            query_vector, memory_class, agent_id, limit
         )
     
     def _sync_search_chunks_near_vector(
         self,
         query_vector: List[float],
         memory_class: Optional[str],
+        agent_id: Optional[uuid.UUID],
         limit: int,
     ) -> List[Dict[str, Any]]:
         """Synchronous near-vector search (runs in thread pool)."""
         collection = self._client.collections.get("MemoryChunk")
         
+        filters = []
+        if memory_class:
+            filters.append(f"memory_class == '{memory_class}'")
+        if agent_id:
+            filters.append(f"agent_id == '{str(agent_id)}'")
+        
+        where_filter = None
+        if filters:
+            where_filter = {"operator": "And", "operands": [
+                {"path": [f.split(" ")[0]], "operator": "Equal", "valueText": f.split("==")[1].strip()}
+                for f in filters
+            ]}
+
         search_params = {
             "vector": query_vector,
             "limit": limit,
         }
+        
+        if where_filter:
+            search_params["where"] = where_filter
         
         results = collection.query.near_vector(**search_params)
         
@@ -596,6 +720,7 @@ class WeaviateClient:
         self,
         text: str,
         memory_class: Optional[str] = None,
+        agent_id: Optional[uuid.UUID] = None,
         limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """Near-text (semantic) search on MemoryChunk collection.
@@ -612,22 +737,39 @@ class WeaviateClient:
         return await loop.run_in_executor(
             self._pool,
             self._sync_search_chunks_near_text,
-            text, memory_class, limit
+            text, memory_class, agent_id, limit
         )
     
     def _sync_search_chunks_near_text(
         self,
         text: str,
         memory_class: Optional[str],
+        agent_id: Optional[uuid.UUID],
         limit: int,
     ) -> List[Dict[str, Any]]:
         """Synchronous near-text search (runs in thread pool)."""
         collection = self._client.collections.get("MemoryChunk")
         
+        filters = []
+        if memory_class:
+            filters.append(f"memory_class == '{memory_class}'")
+        if agent_id:
+            filters.append(f"agent_id == '{str(agent_id)}'")
+        
+        where_filter = None
+        if filters:
+            where_filter = {"operator": "And", "operands": [
+                {"path": [f.split(" ")[0]], "operator": "Equal", "valueText": f.split("==")[1].strip()}
+                for f in filters
+            ]}
+
         search_params = {
             "query": text,
             "limit": limit,
         }
+        
+        if where_filter:
+            search_params["where"] = where_filter
         
         results = collection.query.near_text(**search_params)
         

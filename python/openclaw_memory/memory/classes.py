@@ -222,6 +222,18 @@ class Memory:
         """Initialize ID and timestamps if not provided."""
         if self.id is None:
             self.id = uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = UUID(current_agent_id)
+            except Exception:
+                # Fallback: if context not available, keep as None (should be rare)
+                pass
+
         if self.extraction_timestamp is None:
             self.extraction_timestamp = datetime.utcnow()
         if self.created_at is None:

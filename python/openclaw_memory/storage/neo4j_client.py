@@ -128,8 +128,34 @@ class UserNode:
     email: Optional[str] = None
     external_id: Optional[str] = None
     preferences: Dict[str, Any] = field(default_factory=dict)
+    agent_id: Optional[uuid.UUID] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     neo4j_id: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize IDs and timestamps if not provided."""
+        if self.id is None:
+            self.id = uuid.uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
+
+        # Automatically set tenant_id from the verified security context if not provided
+        if self.tenant_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_tenant_id
+                current_tenant_id = get_current_tenant_id()
+                if current_tenant_id:
+                    self.tenant_id = uuid.UUID(current_tenant_id)
+            except Exception:
+                pass
 
 
 @dataclass
@@ -141,8 +167,34 @@ class AgentNode:
     role: Optional[str] = None
     model: Optional[str] = None
     capabilities: List[str] = field(default_factory=list)
+    agent_id: Optional[uuid.UUID] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     neo4j_id: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize IDs and timestamps if not provided."""
+        if self.id is None:
+            self.id = uuid.uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
+
+        # Automatically set tenant_id from the verified security context if not provided
+        if self.tenant_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_tenant_id
+                current_tenant_id = get_current_tenant_id()
+                if current_tenant_id:
+                    self.tenant_id = uuid.UUID(current_tenant_id)
+            except Exception:
+                pass
 
 
 @dataclass
@@ -154,7 +206,33 @@ class SessionNode:
     started_at: datetime = field(default_factory=datetime.utcnow)
     ended_at: Optional[datetime] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    agent_id: Optional[uuid.UUID] = None
     neo4j_id: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize IDs and timestamps if not provided."""
+        if self.id is None:
+            self.id = uuid.uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
+
+        # Automatically set tenant_id from the verified security context if not provided
+        if self.tenant_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_tenant_id
+                current_tenant_id = get_current_tenant_id()
+                if current_tenant_id:
+                    self.tenant_id = uuid.UUID(current_tenant_id)
+            except Exception:
+                pass
 
 
 @dataclass
@@ -166,7 +244,23 @@ class MessageNode:
     content: str = ""
     tokens_used: int = 0
     created_at: datetime = field(default_factory=datetime.utcnow)
+    agent_id: Optional[uuid.UUID] = None
     neo4j_id: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize IDs and timestamps if not provided."""
+        if self.id is None:
+            self.id = uuid.uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
 
 
 @dataclass
@@ -181,7 +275,33 @@ class EntityNode:
     properties: Dict[str, Any] = field(default_factory=dict)
     aliases: List[str] = field(default_factory=list)
     confidence: float = 0.5
+    agent_id: Optional[uuid.UUID] = None
     neo4j_id: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize IDs and timestamps if not provided."""
+        if self.id is None:
+            self.id = uuid.uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
+
+        # Automatically set tenant_id from the verified security context if not provided
+        if self.tenant_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_tenant_id
+                current_tenant_id = get_current_tenant_id()
+                if current_tenant_id:
+                    self.tenant_id = uuid.UUID(current_tenant_id)
+            except Exception:
+                pass
 
 
 @dataclass
@@ -198,8 +318,23 @@ class DecisionNode:
     valid_from: datetime = field(default_factory=datetime.utcnow)
     valid_to: Optional[datetime] = None
     decided_by: Optional[uuid.UUID] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    agent_id: Optional[uuid.UUID] = None
     neo4j_id: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize IDs and timestamps if not provided."""
+        if self.id is None:
+            self.id = uuid.uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
 
 
 @dataclass
@@ -213,8 +348,23 @@ class ClaimNode:
     extracted_by: Optional[str] = None
     valid_from: datetime = field(default_factory=datetime.utcnow)
     valid_to: Optional[datetime] = None
-    superseded_by: Optional[uuid.UUID] = None
+    agent_id: Optional[uuid.UUID] = None
     neo4j_id: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize IDs and timestamps if not provided."""
+        if self.id is None:
+            self.id = uuid.uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
 
 
 @dataclass
@@ -226,7 +376,23 @@ class ToolCallNode:
     success: bool = False
     execution_time_ms: Optional[int] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
+    agent_id: Optional[uuid.UUID] = None
     neo4j_id: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize IDs and timestamps if not provided."""
+        if self.id is None:
+            self.id = uuid.uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = uuid.UUID(current_agent_id)
+            except Exception:
+                pass
 
 
 class Neo4jClient:
@@ -336,6 +502,7 @@ class Neo4jClient:
                 email: $email,
                 external_id: $external_id,
                 preferences: $preferences,
+                agent_id: $agent_id,
                 created_at: $created_at
             })
             RETURN elementId(u) as neo4j_id
@@ -350,6 +517,7 @@ class Neo4jClient:
                 email=user.email,
                 external_id=user.external_id,
                 preferences=json.dumps(user.preferences),
+                agent_id=str(user.agent_id) if user.agent_id else None,
                 created_at=user.created_at.isoformat(),
             )
             record = await result.single()
@@ -380,6 +548,7 @@ class Neo4jClient:
                 role: $role,
                 model: $model,
                 capabilities: $capabilities,
+                agent_id: $agent_id,
                 created_at: $created_at
             })
             RETURN elementId(a) as neo4j_id
@@ -394,6 +563,7 @@ class Neo4jClient:
                 role=agent.role,
                 model=agent.model,
                 capabilities=agent.capabilities,
+                agent_id=str(agent.agent_id) if agent.agent_id else None,
                 created_at=agent.created_at.isoformat(),
             )
             record = await result.single()
@@ -412,6 +582,7 @@ class Neo4jClient:
                 channel: $channel,
                 started_at: $started_at,
                 ended_at: $ended_at,
+                agent_id: $agent_id,
                 metadata: $metadata
             })
             RETURN elementId(s) as neo4j_id
@@ -425,6 +596,7 @@ class Neo4jClient:
                 channel=session.channel,
                 started_at=session.started_at.isoformat(),
                 ended_at=session.ended_at.isoformat() if session.ended_at else None,
+                agent_id=str(session.agent_id) if session.agent_id else None,
                 metadata=json.dumps(session.metadata),
             )
             record = await result.single()
@@ -443,6 +615,7 @@ class Neo4jClient:
                 role: $role,
                 content: $content,
                 tokens_used: $tokens_used,
+                agent_id: $agent_id,
                 created_at: $created_at
             })
             RETURN elementId(m) as neo4j_id
@@ -456,6 +629,7 @@ class Neo4jClient:
                 role=message.role,
                 content=message.content,
                 tokens_used=message.tokens_used,
+                agent_id=str(message.agent_id) if message.agent_id else None,
                 created_at=message.created_at.isoformat(),
             )
             record = await result.single()
@@ -496,7 +670,8 @@ class Neo4jClient:
                 description: $description,
                 properties: $properties,
                 aliases: $aliases,
-                confidence: $confidence
+                confidence: $confidence,
+                agent_id: $agent_id
             })
             RETURN elementId(e) as neo4j_id
         """
@@ -513,6 +688,7 @@ class Neo4jClient:
                 properties=json.dumps(entity.properties),
                 aliases=entity.aliases,
                 confidence=entity.confidence,
+                agent_id=str(entity.agent_id) if entity.agent_id else None,
             )
             record = await result.single()
             return record["neo4j_id"] if record else None
@@ -586,6 +762,7 @@ class Neo4jClient:
                 valid_from: $valid_from,
                 valid_to: $valid_to,
                 decided_by: $decided_by,
+                agent_id: $agent_id,
                 created_at: $created_at
             })
             RETURN elementId(d) as neo4j_id
@@ -605,6 +782,7 @@ class Neo4jClient:
                 valid_from=decision.valid_from.isoformat(),
                 valid_to=decision.valid_to.isoformat() if decision.valid_to else None,
                 decided_by=str(decision.decided_by) if decision.decided_by else None,
+                agent_id=str(decision.agent_id) if decision.agent_id else None,
                 created_at=decision.created_at.isoformat(),
             )
             record = await result.single()
@@ -641,6 +819,7 @@ class Neo4jClient:
                 extracted_by: $extracted_by,
                 valid_from: $valid_from,
                 valid_to: $valid_to,
+                agent_id: $agent_id,
                 superseded_by: $superseded_by
             })
             RETURN elementId(c) as neo4j_id
@@ -657,6 +836,7 @@ class Neo4jClient:
                 extracted_by=claim.extracted_by,
                 valid_from=claim.valid_from.isoformat(),
                 valid_to=claim.valid_to.isoformat() if claim.valid_to else None,
+                agent_id=str(claim.agent_id) if claim.agent_id else None,
                 superseded_by=str(claim.superseded_by) if claim.superseded_by else None,
             )
             record = await result.single()
@@ -675,6 +855,7 @@ class Neo4jClient:
                 tool_name: $tool_name,
                 success: $success,
                 execution_time_ms: $execution_time_ms,
+                agent_id: $agent_id,
                 created_at: $created_at
             })
             RETURN elementId(t) as neo4j_id
@@ -688,6 +869,7 @@ class Neo4jClient:
                 tool_name=tool_call.tool_name,
                 success=tool_call.success,
                 execution_time_ms=tool_call.execution_time_ms,
+                agent_id=str(tool_call.agent_id) if tool_call.agent_id else None,
                 created_at=tool_call.created_at.isoformat(),
             )
             record = await result.single()
@@ -698,6 +880,7 @@ class Neo4jClient:
     async def traverse_entity_relationships(
         self,
         entity_id: uuid.UUID,
+        agent_id: Optional[uuid.UUID] = None,
         depth: int = 2,
     ) -> List[Dict[str, Any]]:
         """Traverse relationships from an entity up to specified depth."""
@@ -712,13 +895,14 @@ class Neo4jClient:
             start_time = time.perf_counter() if _OBSERVABILITY_AVAILABLE else 0
             
             query = f"""
-                MATCH path = (e:Entity {{id: $id}})-[{':'.join(['r'] * depth)}*1..{depth}]->(related)
+                MATCH path = (e:Entity {{id: $id, agent_id: $agent_id}})-[{':'.join(['r'] * depth)}*1..{depth}]->(related)
+                WHERE related.agent_id = $agent_id OR related.visibility_scope = 'public'
                 RETURN path
                 LIMIT 100
             """
             
             async with self._driver.session(database=self.database) as session:
-                result = await session.run(query, id=str(entity_id))
+                result = await session.run(query, id=str(entity_id), agent_id=str(agent_id) if agent_id else None)
                 paths = []
                 async for record in result:
                     path = record["path"]
@@ -782,10 +966,11 @@ class Neo4jClient:
     async def get_session_context(
         self,
         session_id: uuid.UUID,
+        agent_id: Optional[uuid.UUID] = None,
     ) -> Dict[str, Any]:
         """Get full context for a session (messages, entities, decisions)."""
         query = """
-            MATCH (s:Session {id: $session_id})
+            MATCH (s:Session {id: $session_id, agent_id: $agent_id})
             OPTIONAL MATCH (s)<-[:INVOLVED]-(u:User)
             OPTIONAL MATCH (s)<-[:INVOLVED]-(a:Agent)
             OPTIONAL MATCH (s)<-[:SAID_IN]-(m:Message)
@@ -799,7 +984,7 @@ class Neo4jClient:
         """
         
         async with self._driver.session(database=self.database) as session:
-            result = await session.run(query, id=str(session_id))
+            result = await session.run(query, session_id=str(session_id), agent_id=str(agent_id) if agent_id else None)
             record = await result.single()
             if record:
                 return {

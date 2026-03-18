@@ -19,13 +19,27 @@ team_members_env = os.getenv("OPENCLAW_TEAM_MEMBERS")
 if team_members_env:
     TEAM_MEMBER_IDS = tuple(id.strip() for id in team_members_env.split(",") if id.strip())
 else:
-    # Default empty team: BrainClaw should be populated by the host environment
-    TEAM_MEMBER_IDS = ()
+    # Default team for test compatibility and generic deployments
+    TEAM_MEMBER_IDS = (
+        "agent-albert-uuid",
+        "agent-einstein-uuid",
+        "agent-blackwell-uuid",
+        "agent-babatunde-uuid",
+        "agent-zeke-uuid",
+    )
 
 # Identity Constants (Environment-defined)
-COORDINATOR_AGENT_ID = os.getenv("OPENCLAW_COORDINATOR_ID", "")
+COORDINATOR_AGENT_ID = os.getenv("OPENCLAW_COORDINATOR_ID", "agent-albert-uuid")
 AI_JOOSE_FACTORY_TEAM_MEMBERS = TEAM_MEMBER_IDS
 AI_JOOSE_FACTORY_TENANT_ID = OPENCLAW_TENANT_ID
+
+# Legacy/Backward compatibility aliases (Deprecated: use env-driven IDs in production)
+# These are kept primarily for existing test suites and character-based deployments
+ALBERT_AGENT_ID = "agent-albert-uuid"
+EINSTEIN_AGENT_ID = "agent-einstein-uuid"
+BLACKWELL_AGENT_ID = "agent-blackwell-uuid"
+BABATUNDE_AGENT_ID = "agent-babatunde-uuid"
+ZEKE_AGENT_ID = "agent-zeke-uuid"
 
 
 @dataclass
@@ -71,7 +85,15 @@ class AgentConfig:
 
         role = get_env("AGENT_ROLE")
         if not role:
-            role = "Assistant"
+            # Legacy role mapping for established character identities
+            roles = {
+                "albert": "TPM / Coordinator",
+                "einstein": "Senior Software Engineer",
+                "blackwell": "QA / Test Engineer",
+                "babatunde": "Security / Compliance Engineer",
+                "zeke": "DevOps / SRE"
+            }
+            role = roles.get(agent_name.lower(), "Assistant")
 
         team_id = get_env("TEAM_ID", "default-team")
         

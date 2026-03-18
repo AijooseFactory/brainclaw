@@ -9,6 +9,8 @@ import { getLogger, classifyError, ErrorCategory } from "./logging.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import * as crypto from "crypto";
+
 /**
  * Internal reference that can be overridden for tests.
  */
@@ -87,12 +89,30 @@ export async function callPythonBackend(
     warnIfPlaintextSecret("postgresUrl", config.postgresUrl);
     warnIfPlaintextSecret("neo4jPassword", config.neo4jPassword);
 
+    // 4. Secure Identity Token (BRAINCLAW V2)
+    // Create a signed HMAC token to prevent identity spoofing in the Python backend
+    const brainclawSecret = config.brainclawSecret || process.env.BRAINCLAW_SECRET || 'dev-brainclaw-secret';
+    const agentContext = {
+      agentId: ctx.agentId || 'agent-unknown',
+      agentName: ctx.agentName || 'unknown',
+      teamId: ctx.teamId || 'team-default',
+      tenantId: config.tenantId || process.env.OPENCLAW_TENANT_ID || 'tenant-default',
+      timestamp: Date.now()
+    };
+    
+    const message = `${agentContext.agentId}:${agentContext.agentName}:${agentContext.teamId}:${agentContext.tenantId}:${agentContext.timestamp}`;
+    const hmac = crypto.createHmac('sha256', brainclawSecret);
+    hmac.update(message);
+    const signature = hmac.digest('hex');
+    const identityToken = Buffer.from(JSON.stringify({ ...agentContext, signature })).toString('base64');
+
     const bridgeScript = `
 import sys
 import json
 import dataclasses
 from enum import Enum
 import os
+import base64
 sys.path.append("${pythonBackendPath}")
 
 class EnhancedJSONEncoder(json.JSONEncoder):
@@ -104,6 +124,15 @@ class EnhancedJSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 try:
+    # BrainClaw V2: Identity Verification
+    from openclaw_memory.security.access_control import verify_identity_token
+    
+    token = os.getenv("BRAINCLAW_IDENTITY_TOKEN")
+    secret = os.getenv("BRAINCLAW_SECRET")
+    
+    # Verify and set global context
+    context = verify_identity_token(token, secret)
+    
     from openclaw_memory.${module} import ${funct}
     
     # Execute the requested function with params
@@ -124,10 +153,14 @@ except Exception as e:
       NEO4J_URL: config.neo4jUrl || process.env.NEO4J_URL,
       NEO4J_PASSWORD: config.neo4jPassword || process.env.NEO4J_PASSWORD,
       
-      // Inject OpenClaw Agent Context
-      AGENT_ID: ctx.agentId || process.env.AGENT_ID || 'agent-unknown',
-      AGENT_NAME: ctx.agentName || process.env.AGENT_NAME || 'unknown',
-      TEAM_ID: config.teamId || process.env.TEAM_ID || 'team-default',
+      // Inject OpenClaw Agent Context (V2: Signed Token)
+      BRAINCLAW_IDENTITY_TOKEN: identityToken,
+      BRAINCLAW_SECRET: brainclawSecret,
+      
+      // Legacy context (for backwards compatibility during migration)
+      AGENT_ID: agentContext.agentId,
+      AGENT_NAME: agentContext.agentName,
+      TEAM_ID: agentContext.teamId,
       
       // Pass the backend path explicitly to sys.path
       OPENCLAW_PYTHON_BACKEND: pythonBackendPath

@@ -56,6 +56,7 @@ class MemoryItem:
     source_message_id: Optional[UUID] = None
     source_session_id: Optional[UUID] = None
     source_tool_call_id: Optional[UUID] = None
+    agent_id: Optional[UUID] = None
     extracted_by: Optional[str] = None
     extraction_method: Optional[str] = None
     extraction_timestamp: Optional[datetime] = None
@@ -84,6 +85,31 @@ class MemoryItem:
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     
+    def __post_init__(self):
+        """Initialize IDs and timestamps if not provided."""
+        if self.id is None:
+            self.id = uuid4()
+        
+        # Automatically set agent_id from the verified security context if not provided
+        if self.agent_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    self.agent_id = UUID(current_agent_id)
+            except Exception:
+                pass
+
+        # Automatically set tenant_id from the verified security context if not provided
+        if self.tenant_id is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_tenant_id
+                current_tenant_id = get_current_tenant_id()
+                if current_tenant_id:
+                    self.tenant_id = UUID(current_tenant_id)
+            except Exception:
+                pass
+    
     def to_dict(self) -> dict:
         """Convert to dictionary for database insertion."""
         d = {
@@ -95,6 +121,7 @@ class MemoryItem:
             "source_message_id": self.source_message_id,
             "source_session_id": self.source_session_id,
             "source_tool_call_id": self.source_tool_call_id,
+            "agent_id": self.agent_id,
             "extracted_by": self.extracted_by,
             "extraction_method": self.extraction_method,
             "extraction_confidence": self.extraction_confidence,
@@ -205,44 +232,47 @@ class PostgresClient:
             
             query = """
                 INSERT INTO memory_items (
-                    id, tenant_id, memory_class, memory_type, content,
+                    id, tenant_id, agent_id, memory_class, memory_type, content,
                     content_embedding, source_message_id, source_session_id,
                     source_tool_call_id, extracted_by, extraction_method,
                     extraction_confidence, extraction_metadata, confidence, user_confirmed,
                     valid_from, valid_to, is_current, visibility_scope, access_control,
                     retention_policy, retention_until
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-                    $16, $17, $18, $19, $20, $21, $22
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+                    $17, $18, $19, $20, $21, $22, $23
                 )
                 RETURNING *
             """
             async with self._pool.acquire() as conn:
+                from openclaw_memory.security.access_control import set_db_session_context
+                await set_db_session_context(conn)
                 row = await conn.fetchrow(
                     query,
                     item.id,
-                item.tenant_id,
-                item.memory_class,
-                item.memory_type,
-                item.content,
-                item.content_embedding,
-                item.source_message_id,
-                item.source_session_id,
-                item.source_tool_call_id,
-                item.extracted_by,
-                item.extraction_method,
-                item.extraction_confidence,
-                json.dumps(item.extraction_metadata),
-                item.confidence,
-                item.user_confirmed,
-                item.valid_from,
-                item.valid_to,
-                item.is_current,
-                item.visibility_scope,
-                json.dumps(item.access_control),
-                item.retention_policy,
-                item.retention_until,
-            )
+                    item.tenant_id,
+                    item.agent_id,
+                    item.memory_class,
+                    item.memory_type,
+                    item.content,
+                    item.content_embedding,
+                    item.source_message_id,
+                    item.source_session_id,
+                    item.source_tool_call_id,
+                    item.extracted_by,
+                    item.extraction_method,
+                    item.extraction_confidence,
+                    json.dumps(item.extraction_metadata),
+                    item.confidence,
+                    item.user_confirmed,
+                    item.valid_from,
+                    item.valid_to,
+                    item.is_current,
+                    item.visibility_scope,
+                    json.dumps(item.access_control),
+                    item.retention_policy,
+                    item.retention_until,
+                )
             
             # Record metrics
             if _OBSERVABILITY_AVAILABLE:
@@ -272,6 +302,8 @@ class PostgresClient:
         """
         query = "SELECT * FROM memory_items WHERE id = $1"
         async with self._pool.acquire() as conn:
+            from openclaw_memory.security.access_control import set_db_session_context
+            await set_db_session_context(conn)
             row = await conn.fetchrow(
                 query,
                 item_id
@@ -343,6 +375,8 @@ class PostgresClient:
             start_time = time.perf_counter() if _OBSERVABILITY_AVAILABLE else 0
             
             async with self._pool.acquire() as conn:
+                from openclaw_memory.security.access_control import set_db_session_context
+                await set_db_session_context(conn)
                 rows = await conn.fetch(query, *params)
                 result = [self._row_to_memory_item(row) for row in rows]
             
@@ -387,6 +421,8 @@ class PostgresClient:
             New MemoryItem that supersedes the original
         """
         async with self._pool.acquire() as conn:
+            from openclaw_memory.security.access_control import set_db_session_context, get_current_agent_id
+            await set_db_session_context(conn)
             update_query = """
                     UPDATE memory_items
                     SET is_current = FALSE, 
@@ -406,7 +442,7 @@ class PostgresClient:
                         visibility_scope, source_session_id, source_message_id
                     )
                     SELECT 
-                        tenant_id, memory_class, memory_type, $2,
+                        tenant_id, agent_id, memory_class, memory_type, $2,
                         COALESCE($3, confidence), NOW(), TRUE, $1,
                         visibility_scope, source_session_id, source_message_id
                     FROM memory_items WHERE id = $1
@@ -470,6 +506,8 @@ class PostgresClient:
         """
         
         async with self._pool.acquire() as conn:
+            from openclaw_memory.security.access_control import set_db_session_context
+            await set_db_session_context(conn)
             rows = await conn.fetch(query, *params)
             return [self._row_to_memory_item(row) for row in rows]
     
@@ -494,16 +532,18 @@ class PostgresClient:
                 item.id = uuid4()
         
         async with self._pool.acquire() as conn:
+            from openclaw_memory.security.access_control import set_db_session_context
+            await set_db_session_context(conn)
             query = """
                     INSERT INTO memory_items (
-                        id, tenant_id, memory_class, memory_type, content,
+                        id, tenant_id, agent_id, memory_class, memory_type, content,
                         content_embedding, source_message_id, source_session_id,
                         source_tool_call_id, extracted_by, extraction_method,
                         extraction_confidence, confidence, user_confirmed,
                         valid_from, visibility_scope, retention_policy
                     ) VALUES (
                         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                        $15, $16, $17
+                        $15, $16, $17, $18
                     )
                     RETURNING *
             """
@@ -514,6 +554,7 @@ class PostgresClient:
                         (
                             item.id,
                             item.tenant_id,
+                            item.agent_id,
                             item.memory_class,
                             item.memory_type,
                             item.content,
@@ -599,6 +640,7 @@ class PostgresClient:
             source_message_id=row["source_message_id"],
             source_session_id=row["source_session_id"],
             source_tool_call_id=row["source_tool_call_id"],
+            agent_id=row.get("agent_id"),
             extracted_by=row["extracted_by"],
             extraction_method=row["extraction_method"],
             extraction_confidence=row["extraction_confidence"],

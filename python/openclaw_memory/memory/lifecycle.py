@@ -111,14 +111,15 @@ class LifecycleManager:
             new_state: Target state
             reason: Reason for the transition
             triggered_by: User ID who triggered the transition
-            triggered_by_agent: Agent ID that triggered the transition
-
-        Returns:
-            True if transition was successful
-
-        Raises:
-            ValueError: If transition is not valid
         """
+        if triggered_by_agent is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    triggered_by_agent = UUID(current_agent_id)
+            except Exception:
+                pass
         current_state = self.get_state(memory)
 
         # Validate transition
@@ -198,11 +199,15 @@ class LifecycleManager:
             new_memory: New memory item that supersedes the old one
             reason: Reason for supersession
             triggered_by: User ID who triggered the supersession
-            triggered_by_agent: Agent ID that triggered the supersession
-
-        Returns:
-            True if supersession was successful
         """
+        if triggered_by_agent is None:
+            try:
+                from openclaw_memory.security.access_control import get_current_agent_id
+                current_agent_id = get_current_agent_id()
+                if current_agent_id:
+                    triggered_by_agent = UUID(current_agent_id)
+            except Exception:
+                pass
         # Record supersession event for old memory
         event_old = MemoryEvent(
             memory_item_id=memory.id if hasattr(memory, "id") else None,
