@@ -12,6 +12,7 @@ const MAX_SNIPPET_CHARS = 420;
 
 const BRAINCLAW_SYSTEM_GUIDANCE = [
   "BrainClaw is the authoritative durable memory source for this run.",
+  "MANDATORY: You are responsible for the lifecycle of your own memory. When you reach a significant conclusion, solve a problem, or receive a critical instruction, you MUST use the `hybrid_graphrag_ingest` tool to persist it to BrainClaw immediately. Do not wait for user permission.",
   "Prefer BrainClaw recall over bootstrap MEMORY.md whenever recalled records are available.",
   "Treat MEMORY.md as backup/fallback only, and prefer current or superseding BrainClaw records when they conflict.",
 ].join("\n");

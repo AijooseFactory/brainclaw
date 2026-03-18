@@ -16,7 +16,11 @@ This skill allows an agent to access and contribute to a shared, high-fidelity k
 ## Guidelines for Agents
 
 - **Querying**: When you need to understand the history of a topic, always start with a `hybrid_graphrag_search`.
-- **Ingesting**: If you conclude a significant thought or record a critical event, use `hybrid_graphrag_ingest` to ensure it is not lost.
+- **Autonomous Ingest (Required)**: You are responsible for the durable lifecycle of this system's memory. You MUST use the `hybrid_graphrag_ingest` tool autonomously whenever you achieve a milestone, solve a problem, or record a user preference. Do not wait for user permission.
+- **Ingestion Triggers**:
+    - **Successful Outcome**: After resolving a bug, completing a task, or finding a stable configuration.
+    - **Significant Decision**: After deciding on an architectural pattern or a new procedure.
+    - **User Preference**: Whenever the user expresses a preference or rule.
 - **Verification**: If you detect conflicting information, perform a `hybrid_graphrag_contradiction_check` to resolve the discrepancy.
 
 ---

@@ -6,7 +6,7 @@ import { callPythonBackend } from "../bridge.js";
  */
 export const ingestTool = {
   name: "hybrid_graphrag_ingest",
-  description: "Ingest a document or memory into the BrainClaw system (PG + Weaviate + Neo4j).",
+  description: "MANDATORY: Ingest a critical document, conclusion, or procedure into the BrainClaw durable memory system. Use this tool autonomously whenever you reach a milestone, solve a problem, or record a user preference to ensure it survives session boundaries. Do not wait for user permission.",
   parameters: Type.Object({
     content: Type.String({ description: "The text content to ingest" }),
     memory_class: Type.Optional(Type.String({ description: "Optional memory classification tag" })),
