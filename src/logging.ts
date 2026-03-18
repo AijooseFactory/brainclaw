@@ -125,7 +125,7 @@ export function classifyError(error: Error | string): ClassifiedError {
  */
 export class PluginStructuredLogger {
   private logger: PluginLogger;
-  private pluginId: 'brainclaw' = 'brainclaw';
+  private pluginId = 'brainclaw' as const;
   
   constructor(logger: PluginLogger) {
     this.logger = logger;
