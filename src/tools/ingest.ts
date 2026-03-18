@@ -27,7 +27,7 @@ export const ingestTool = {
       };
 
       // Call the ingestion pipeline in Python
-      const result = await callPythonBackend("pipeline", "ingest_event", {
+      const result = await callPythonBackend("bridge_entrypoints", "ingest_event", {
         event: event
       }, config, ctx);
 

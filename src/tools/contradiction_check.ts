@@ -14,31 +14,23 @@ export const contradictionCheckTool = {
   async execute(_id: string, params: any, ctx: any) {
     const config = ctx.config || {};
     try {
-      // Retrieve relevant memories for checking contradictions
-      const query = params.entity_name ? `What are the claims about ${params.entity_name}?` : "Are there any contradictions in current memories?";
-      
-      const classification = await callPythonBackend("retrieval", "classify", { query }, config, ctx);
-      
-      const results = await callPythonBackend("retrieval", "retrieve_sync", {
-        query: query,
-        intent: classification,
-        tenant_id: params.tenant_id || "default",
-        limit: 20
-      }, config, ctx);
+      const result = await callPythonBackend(
+        "bridge_entrypoints",
+        "check_contradictions",
+        {
+          entity_name: params.entity_name || "",
+          tenant_id: params.tenant_id || "",
+          limit: 20,
+        },
+        config,
+        ctx,
+      );
 
-      // Placeholder for real contradiction detection logic
-      // This could be an LLM call to compare the retrieved results
-      
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({
-              status: "NO_CONTRADICTIONS_FOUND",
-              checked_entities: params.entity_name ? [params.entity_name] : ["global"],
-              evidence_count: results.length,
-              details: "All retrieved evidence is consistent and follows a logical progression."
-            }, null, 2)
+            text: JSON.stringify(result, null, 2)
           }
         ]
       };

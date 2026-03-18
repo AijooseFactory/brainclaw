@@ -1,10 +1,11 @@
-# BrainClaw Plugin for OpenClaw
+# BrainClaw Plugin v1.3.0
 
-BrainClaw is a Hybrid GraphRAG plugin for OpenClaw that serves as its memory and knowledge system. It enables OpenClaw agents to retain, learn from, and retrieve context across conversations and sessions, with enterprise-grade observability, automatic summarization, and active learning capabilities.
+BrainClaw is a Hardened Hybrid GraphRAG Plugin for OpenClaw with Multi-Agent Isolation. It serves as its memory and knowledge system. It enables OpenClaw agents to retain, learn from, and retrieve context across conversations and sessions, with enterprise-grade observability, automatic summarization, and active learning capabilities.
 
 ## Features
 
 - **Multi-store Retrieval**: PostgreSQL (canonical), Weaviate (vector), Neo4j (graph)
+- **Multi-Agent Isolation**: HMAC-SHA256 identity tokens & PostgreSQL RLS
 - **Community Detection**: Leiden algorithm for hierarchical clustering
 - **Audit Ledger**: Immutable audit trail for compliance
 - **Structured Logging**: Error categorization for self-improvement

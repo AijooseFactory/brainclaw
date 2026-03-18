@@ -1,4 +1,5 @@
 import { getLogger } from "../logging.js";
+import { callPythonBackend } from "../bridge.js";
 
 /**
  * Background service for audit ledger maintenance.
@@ -8,13 +9,23 @@ export const auditLoggerService = {
   description: "Background worker for the immutable audit ledger. Monitors state transitions and ensures data non-repudiation.",
   start(ctx: any) {
     const logger = getLogger();
+    const config = ctx.config || {};
     logger.info('audit-logger', 'start', 'Audit ledger service active');
     
     const interval = setInterval(async () => {
       try {
-        // Placeholder for real audit health checking
-        // In a real implementation: await callPythonBackend("audit.audit_log", "verify_integrity", {});
-        logger.debug('audit-logger', 'healthCheck', 'Audit health check running');
+        const result = await callPythonBackend(
+          "bridge_entrypoints",
+          "verify_audit_integrity",
+          {},
+          config,
+          ctx,
+        );
+        logger.info('audit-logger', 'healthCheck', 'Audit health check running', {
+          status: result?.status || 'UNKNOWN',
+          tables: result?.tables || {},
+          provenance_gap_count: result?.provenance_gap_count ?? null,
+        });
       } catch (error: any) {
         logger.error('audit-logger', 'healthCheck', error, { interval: '30m' });
       }

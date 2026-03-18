@@ -10,36 +10,25 @@ RRF_K_RANGE = (1, 100)  # Valid range for RRF k constant
 RRF_MAX_RESULTS = 50  # Maximum results to consider from each source
 
 
-# Pre-defined team constants for OpenClaw
 # Environment-driven identity defaults
-OPENCLAW_TENANT_ID = os.getenv("OPENCLAW_TENANT_ID", "tenant-default")
+OPENCLAW_TENANT_ID = os.getenv("OPENCLAW_TENANT_ID") or "default"
 
 # Team members: Comma-separated list of agent IDs
 team_members_env = os.getenv("OPENCLAW_TEAM_MEMBERS")
 if team_members_env:
     TEAM_MEMBER_IDS = tuple(id.strip() for id in team_members_env.split(",") if id.strip())
 else:
-    # Default team for test compatibility and generic deployments
-    TEAM_MEMBER_IDS = (
-        "agent-albert-uuid",
-        "agent-einstein-uuid",
-        "agent-blackwell-uuid",
-        "agent-babatunde-uuid",
-        "agent-zeke-uuid",
-    )
+    TEAM_MEMBER_IDS = tuple()
 
-# Identity Constants (Environment-defined)
-COORDINATOR_AGENT_ID = os.getenv("OPENCLAW_COORDINATOR_ID", "agent-albert-uuid")
-AI_JOOSE_FACTORY_TEAM_MEMBERS = TEAM_MEMBER_IDS
-AI_JOOSE_FACTORY_TENANT_ID = OPENCLAW_TENANT_ID
+# Identity Constants (Environment-driven)
+COORDINATOR_AGENT_ID = os.getenv("OPENCLAW_COORDINATOR_ID", "coordinator")
 
-# Legacy/Backward compatibility aliases (Deprecated: use env-driven IDs in production)
-# These are kept primarily for existing test suites and character-based deployments
-ALBERT_AGENT_ID = "agent-albert-uuid"
-EINSTEIN_AGENT_ID = "agent-einstein-uuid"
-BLACKWELL_AGENT_ID = "agent-blackwell-uuid"
-BABATUNDE_AGENT_ID = "agent-babatunde-uuid"
-ZEKE_AGENT_ID = "agent-zeke-uuid"
+# Role-based agent ID fallbacks (Generic defaults for tests/unconfigured environments)
+COORDINATOR_ID = "coordinator"
+DEVELOPER_ID = "developer"
+QA_ID = "qa"
+SECURITY_ID = "security"
+DEVOPS_ID = "devops"
 
 
 @dataclass
@@ -48,7 +37,7 @@ class AgentConfig:
     agent_id: str
     agent_name: str
     role: str
-    team_id: str = "default-team"
+    team_id: str = "default"
     team_member_ids: List[str] = field(default_factory=lambda: list(TEAM_MEMBER_IDS))
     model: str = "llama3.2"
     capabilities: List[str] = field(default_factory=list)
@@ -76,26 +65,19 @@ class AgentConfig:
 
         # Basic identification
         agent_id = get_env("AGENT_ID")
-        
-        # Basic identification
-        agent_id = get_env("AGENT_ID")
-        
+
         if not agent_id:
-            agent_id = f"agent-{agent_name.lower()}-uuid" if agent_name else "agent-unknown"
+            agent_id = agent_name.lower() if agent_name else "default-agent"
 
         role = get_env("AGENT_ROLE")
         if not role:
-            # Legacy role mapping for established character identities
-            roles = {
-                "albert": "TPM / Coordinator",
-                "einstein": "Senior Software Engineer",
-                "blackwell": "QA / Test Engineer",
-                "babatunde": "Security / Compliance Engineer",
-                "zeke": "DevOps / SRE"
-            }
-            role = roles.get(agent_name.lower(), "Assistant")
+            # Generic role derived from agent name or default to Assistant
+            if agent_name:
+                role = f"{agent_name.capitalize()} Agent"
+            else:
+                role = "OpenClaw Assistant"
 
-        team_id = get_env("TEAM_ID", "default-team")
+        team_id = get_env("TEAM_ID", "default")
         
         # Load team members
         members_str = get_env("TEAM_MEMBERS")
@@ -172,7 +154,7 @@ class PostgresConfig:
 class WeaviateConfig:
     """Weaviate configuration for semantic/hybrid search.
     
-    Connects to existing Weaviate container (ajf-weaviate) or localhost.
+    Connects to a configured Weaviate deployment or localhost.
     """
     host: str = "localhost"
     port: int = 8080
@@ -200,6 +182,10 @@ class WeaviateConfig:
 
     @classmethod
     def from_env(cls) -> "WeaviateConfig":
+        # Try to parse full WEAVIATE_URL first (e.g., http://weaviate:8080)
+        weaviate_url = os.getenv("WEAVIATE_URL")
+        if weaviate_url:
+            return cls.from_url(weaviate_url)
         return cls(
             host=os.getenv("WEAVIATE_HOST", "localhost"),
             port=int(os.getenv("WEAVIATE_PORT", "8080")),
@@ -212,18 +198,15 @@ class Neo4jConfig:
     """Neo4j configuration for relationship graph.
     
     Reads credentials from environment variables for security:
-    - NEO4J_URI: Full connection URI (default: bolt://ajf-neo4j-host-proxy:7687)
+    - NEO4J_URI: Full connection URI (default: bolt://localhost:7687)
     - NEO4J_USER: Username (default: neo4j)
     - NEO4J_PASSWORD: Password (must be set in environment)
-    - NEO4J_DATABASE: Database name (default: ajf-openclaw-graphdb)
-    
-    Note: Uses ajf-neo4j-host-proxy DNS name for Docker network connectivity.
-    The proxy forwards to host.docker.internal:7687 (Neo4j Desktop on Mac).
+    - NEO4J_DATABASE: Database name (default: neo4j)
     """
-    uri: str = "bolt://ajf-neo4j-host-proxy:7687"
+    uri: str = "bolt://localhost:7687"
     user: str = "neo4j"
     password: str = ""  # Must be set via NEO4J_PASSWORD env var
-    database: str = "ajf-openclaw-graphdb"
+    database: str = "neo4j"
     
     @classmethod
     def from_url(cls, url: str) -> "Neo4jConfig":
@@ -236,7 +219,7 @@ class Neo4jConfig:
                 uri=f"{p.scheme}://{p.hostname}:{p.port}" if p.hostname else url,
                 user=p.username or "neo4j",
                 password=p.password or os.getenv("NEO4J_PASSWORD", ""),
-                database=os.getenv("NEO4J_DATABASE", "ajf-openclaw-graphdb"),
+                database=os.getenv("NEO4J_DATABASE", "neo4j"),
             )
         except Exception:
             return cls.from_env()
@@ -244,10 +227,10 @@ class Neo4jConfig:
     @classmethod
     def from_env(cls) -> "Neo4jConfig":
         return cls(
-            uri=os.getenv("NEO4J_URI", "bolt://ajf-neo4j-host-proxy:7687"),
+            uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
             user=os.getenv("NEO4J_USER", "neo4j"),
             password=os.getenv("NEO4J_PASSWORD", ""),
-            database=os.getenv("NEO4J_DATABASE", "ajf-openclaw-graphdb"),
+            database=os.getenv("NEO4J_DATABASE", "neo4j"),
         )
 
 
@@ -370,9 +353,9 @@ class OpenClawMemoryConfig:
             postgres=PostgresConfig.from_url(postgres_url) if postgres_url else PostgresConfig.from_env(),
             weaviate=WeaviateConfig.from_url(weaviate_url) if weaviate_url else WeaviateConfig.from_env(),
             neo4j=Neo4jConfig.from_url(neo4j_url) if neo4j_url else Neo4jConfig.from_env(),
-            agent_id=os.getenv('AGENT_ID', 'agent-unknown'),
-            agent_name=os.getenv('AGENT_NAME', 'unknown'),
-            team_id=os.getenv('TEAM_ID', 'team-default'),
+            agent_id=os.getenv('AGENT_ID', 'default-agent'),
+            agent_name=os.getenv('AGENT_NAME', 'assistant'),
+            team_id=os.getenv('TEAM_ID', 'default'),
             team_member_ids=os.getenv('TEAM_MEMBER_IDS', '').split(',') if os.getenv('TEAM_MEMBER_IDS') else [],
             llm=LLMConfig.from_env(),
             learning=LearningConfig(),

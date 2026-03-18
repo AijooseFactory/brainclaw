@@ -45,8 +45,7 @@ class OpenClawMemoryClient:
             password=config.postgres.password,
         )
         self.weaviate = WeaviateClient(
-            host=config.weaviate.host,
-            port=config.weaviate.port,
+            url=f"http://{config.weaviate.host}:{config.weaviate.port}",
             api_key=config.weaviate.api_key,
         )
         self.neo4j = Neo4jClient(

@@ -23,12 +23,12 @@ export const searchTool = {
     const config = ctx.config || {};
     try {
       // 1. Classify intent (needed for the retrieve function)
-      const classification = await callPythonBackend("retrieval", "classify", { 
+      const classification = await callPythonBackend("bridge_entrypoints", "classify", { 
         query: params.query 
       }, config, ctx);
 
       // 2. Execute retrieval
-      const results = await callPythonBackend("retrieval", "retrieve_sync", {
+      const results = await callPythonBackend("bridge_entrypoints", "retrieve_sync", {
         query: params.query,
         intent: classification, 
         tenant_id: params.tenant_id || "default",

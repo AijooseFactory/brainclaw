@@ -9,9 +9,26 @@ import base64
 import os
 import time
 from typing import Dict, Any, Optional
+import uuid
 
 # Global session context (per-thread in production; per-process in tests)
 _CURRENT_CONTEXT: Dict[str, Any] = {}
+BRAINCLAW_NS = uuid.UUID("b4a1bc1a-0000-4000-a000-b4a1bc1ab000")
+
+
+def canonicalize_identity_id(value: Optional[str]) -> Optional[str]:
+    """Convert OpenClaw identity slugs into stable UUID strings for storage."""
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    try:
+        return str(uuid.UUID(text))
+    except ValueError:
+        return str(uuid.uuid5(BRAINCLAW_NS, text))
 
 
 def verify_identity_token(token_b64: str, secret: str) -> Dict[str, Any]:
@@ -45,8 +62,9 @@ def verify_identity_token(token_b64: str, secret: str) -> Dict[str, Any]:
 
     # Canonicalize and verify using stable string concatenation
     message = (
-        f"{data.get('agentId')}:{data.get('agentName')}:"
-        f"{data.get('teamId')}:{data.get('tenantId')}:{data.get('timestamp')}"
+        f"{data.get('agentId') or ''}:{data.get('agentName') or ''}:"
+        f"{data.get('teamId') or ''}:{data.get('tenantId') or ''}:"
+        f"{data.get('timestamp')}"
     )
 
     expected_hmac = hmac.new(
@@ -84,6 +102,16 @@ def get_current_tenant_id() -> Optional[str]:
     return _CURRENT_CONTEXT.get("tenantId")
 
 
+def get_current_agent_db_id() -> Optional[str]:
+    """Returns the canonical UUID form of the verified agent id."""
+    return canonicalize_identity_id(get_current_agent_id())
+
+
+def get_current_tenant_db_id() -> Optional[str]:
+    """Returns the canonical UUID form of the verified tenant id."""
+    return canonicalize_identity_id(get_current_tenant_id())
+
+
 async def set_db_session_context(conn, *, verify_team: bool = True):
     """
     Sets the session-level variables for PostgreSQL RLS.
@@ -98,8 +126,8 @@ async def set_db_session_context(conn, *, verify_team: bool = True):
         verify_team:  If True (default), confirms team membership in DB
                       before trusting the teamId from the token.
     """
-    agent_id = get_current_agent_id()
-    tenant_id = get_current_tenant_id()
+    agent_id = get_current_agent_db_id()
+    tenant_id = get_current_tenant_db_id()
     team_id = get_current_team_id()
 
     if agent_id:
@@ -116,5 +144,3 @@ async def set_db_session_context(conn, *, verify_team: bool = True):
                 # Deny team scope — treat as individual agent
                 return
         await conn.execute(f"SET app.current_team_id = '{team_id}'")
-
-

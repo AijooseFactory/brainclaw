@@ -527,3 +527,22 @@ Summary:"""
 
 # Type hint for PostgresClient to avoid circular import
 from ..storage.postgres import PostgresClient
+
+def summarize_all(tenant_id=None, **kwargs):
+    """Module-level entry point called by the TypeScript bridge.
+    Returns existing community summaries from PostgreSQL (no LLM call)."""
+    import os, psycopg2, psycopg2.extras
+    url = os.getenv("POSTGRES_URL") or os.getenv("POSTGRESQL_URL") or os.getenv("DATABASE_URL")
+    if not url:
+        return {"status": "no_db", "summaries": [], "total": 0}
+    try:
+        conn = psycopg2.connect(url)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if tenant_id:
+            cur.execute("SELECT community_id, tenant_id, summary, node_count, edge_count FROM community_summaries WHERE tenant_id = %s ORDER BY community_id", (tenant_id,))
+        else:
+            cur.execute("SELECT community_id, tenant_id, summary, node_count, edge_count FROM community_summaries ORDER BY community_id")
+        rows = cur.fetchall(); conn.close()
+        return {"status": "ok", "summaries": [dict(r) for r in rows], "total": len(rows)}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "summaries": [], "total": 0}

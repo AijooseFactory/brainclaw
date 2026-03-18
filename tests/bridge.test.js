@@ -2,6 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { callPythonBackend, setSpawn } from "../dist/bridge.js";
 
+const baseBridgeConfig = {
+  brainclawSecret: "test-secret",
+};
+
 test("Bridge Security: Unauthorized routing rejection", async () => {
   try {
     await callPythonBackend("invalid_module", "invalid_func", {});
@@ -22,7 +26,7 @@ test("Bridge Lifecycle: Timeout enforcement", async () => {
     }
   }));
 
-  const config = { pythonTimeoutMs: 10 };
+  const config = { ...baseBridgeConfig, pythonTimeoutMs: 10 };
   try {
     await callPythonBackend("retrieval", "classify", { query: "test" }, config);
     assert.fail("Should have timed out");
@@ -48,7 +52,7 @@ test("Bridge Success: Integration with retrieval (MOCKED)", async () => {
     kill: () => {}
   }));
 
-  const config = { pythonTimeoutMs: 5000 };
+  const config = { ...baseBridgeConfig, pythonTimeoutMs: 5000 };
   try {
     const result = await callPythonBackend("retrieval", "classify", { query: "search test" }, config);
     assert.strictEqual(result.primary_intent, "search");
@@ -70,7 +74,7 @@ test("Bridge Sanitization: Error message stripping", async () => {
   }));
 
   try {
-    await callPythonBackend("retrieval", "classify", { query: "error test" });
+    await callPythonBackend("retrieval", "classify", { query: "error test" }, baseBridgeConfig);
     assert.fail("Should have thrown a Python error");
   } catch (e) {
     assert.ok(!e.message.includes("/Users/"), "Error should not leak local paths");
@@ -78,6 +82,40 @@ test("Bridge Sanitization: Error message stripping", async () => {
   } finally {
     // cleanup
   }
+});
+
+test("Bridge Parsing: accepts trailing JSON after backend log noise", async () => {
+  setSpawn(() => ({
+    stdout: {
+      on(event, cb) {
+        if (event === "data") {
+          cb(
+            Buffer.from(
+              [
+                'HTTP Request: GET http://weaviate:8080/v1/meta "HTTP/1.1 200 OK"',
+                '{"results":[{"id":"mem-1","content":"PostgreSQL is canonical."}],"total":1}',
+              ].join("\n"),
+            ),
+          );
+        }
+      },
+    },
+    stderr: { on: () => {} },
+    on(event, cb) {
+      if (event === "close") cb(0);
+    },
+    kill() {},
+  }));
+
+  const result = await callPythonBackend(
+    "bridge_entrypoints",
+    "retrieve_sync",
+    { query: "canonical ledger" },
+    baseBridgeConfig,
+  );
+
+  assert.strictEqual(result.total, 1);
+  assert.strictEqual(result.results[0].id, "mem-1");
 });
 
 test("Bridge Config: Custom pythonPath and pythonBackendPath", async () => {
@@ -100,9 +138,10 @@ test("Bridge Config: Custom pythonPath and pythonBackendPath", async () => {
   });
 
   const config = { 
+    ...baseBridgeConfig,
     pythonPath: "/custom/bin/python",
     pythonBackendPath: "/custom/lib/openclaw",
-    pythonTimeoutMs: 5000 
+    pythonTimeoutMs: 5000
   };
   
   try {
@@ -112,4 +151,40 @@ test("Bridge Config: Custom pythonPath and pythonBackendPath", async () => {
   } finally {
     // cleanup
   }
+});
+
+test("Bridge Identity: does not fabricate team or tenant defaults when runtime context is missing", async () => {
+  let capturedEnv;
+
+  setSpawn((_executable, _args, options) => {
+    capturedEnv = options.env;
+    return {
+      stdout: { on: (event, cb) => {
+        if (event === "data") cb(Buffer.from(JSON.stringify({ primary_intent: "search" })));
+      }},
+      stderr: { on: () => {} },
+      on: (event, cb) => {
+        if (event === "close") cb(0);
+      },
+      kill: () => {}
+    };
+  });
+
+  const config = {
+    ...baseBridgeConfig,
+    pythonPath: "/custom/bin/python",
+    pythonBackendPath: "/custom/lib/openclaw",
+    pythonTimeoutMs: 5000
+  };
+
+  await callPythonBackend("bridge_entrypoints", "classify", { query: "portable context" }, config, {});
+
+  const identityToken = capturedEnv.BRAINCLAW_IDENTITY_TOKEN;
+  assert.ok(identityToken, "Expected an identity token to be passed to the Python backend");
+
+  const decoded = JSON.parse(Buffer.from(identityToken, "base64").toString("utf8"));
+
+  assert.ok(!("teamId" in decoded), "teamId should be omitted when OpenClaw does not provide one");
+  assert.ok(!("tenantId" in decoded), "tenantId should be omitted when OpenClaw does not provide one");
+  assert.strictEqual(capturedEnv.TEAM_ID, undefined, "TEAM_ID should not be fabricated by the bridge");
 });

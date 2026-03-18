@@ -403,14 +403,25 @@ class WeaviateClient:
             self._sync_connect
         )
     
-    def _sync_connect(self) -> weaviate.Client:
+    def _sync_connect(self) -> weaviate.WeaviateClient:
         """Synchronous connect (runs in thread pool)."""
         headers = {}
         if self.api_key:
             headers["X-OpenAI-Api-Key"] = self.api_key
         
-        return weaviate.Client(
-            url=self.url,
+        # Parse URL to get host and port
+        url = self.url
+        http_secure = url.startswith("https")
+        host = url.replace("http://", "").replace("https://", "").split(":")[0]
+        port_str = url.rsplit(":", 1)[-1] if ":" in url.split("//", 1)[-1] else "8080"
+        try:
+            port = int(port_str)
+        except ValueError:
+            port = 8080
+        
+        return weaviate.connect_to_custom(
+            http_host=host, http_port=port, http_secure=http_secure,
+            grpc_host=host, grpc_port=50051, grpc_secure=False,
             headers=headers,
         )
     

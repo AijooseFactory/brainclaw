@@ -1,7 +1,18 @@
 -- Migration: 001_agent_isolation.sql
--- Description: Adds agent_id to memory_items and enables Row-Level Security (RLS)
+-- Description: Ensures memory_items table exists and adds agent_id + RLS for multi-agent isolation
 
--- 1. Add agent_id column
+-- 0. Create memory_items table if it does not already exist (safe for fresh and existing DBs)
+CREATE TABLE IF NOT EXISTS memory_items (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id         UUID,
+    visibility_scope TEXT NOT NULL DEFAULT 'agent',
+    content          TEXT NOT NULL,
+    metadata         JSONB,
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 1. Add agent_id column (idempotent — safe if already exists)
 ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS agent_id UUID;
 
 -- 2. Create index for performance
@@ -10,34 +21,23 @@ CREATE INDEX IF NOT EXISTS idx_memory_items_agent_id ON memory_items(agent_id);
 -- 3. Enable Row-Level Security
 ALTER TABLE memory_items ENABLE ROW LEVEL SECURITY;
 
--- 4. Create Policy: Agent Isolation
--- Managers (coordinator) can see everything, other agents see their own or team-shared
+-- 4. Drop policy if it already exists so we can recreate it (idempotent)
+DROP POLICY IF EXISTS agent_isolation_policy ON memory_items;
+
+-- 5. Create Policy: Agent Isolation
+--    Uses current_setting(..., TRUE) so it does not fail when the setting is absent
 CREATE POLICY agent_isolation_policy ON memory_items
     FOR ALL
-    TO openclaw
     USING (
-        -- 1. Owner can see their own
-        agent_id = current_setting('app.current_agent_id')::UUID
-        OR 
-        -- 2. Backward Compatibility: Allow access to legacy data (NULL agent_id)
-        -- We assume legacy data is 'public' within the tenant if no agent is assigned
-        (agent_id IS NULL AND visibility_scope IN ('tenant', 'public'))
-        OR
-        -- 3. Team shared (if agent is in the team)
-        (visibility_scope = 'team' AND EXISTS (
-            SELECT 1 FROM team_members 
-            WHERE team_id = current_setting('app.current_team_id') 
-            AND agent_id = current_setting('app.current_agent_id')::UUID
-        ))
-        OR
-        -- 4. Tenant/Public (explicitly marked)
-        visibility_scope IN ('tenant', 'public')
+        agent_id::TEXT = current_setting('app.current_agent_id', TRUE)
+        OR (agent_id IS NULL AND visibility_scope IN ('tenant', 'public'))
+        OR visibility_scope IN ('tenant', 'public')
     );
 
--- 5. Add team_members table for verification
+-- 6. Team members table for future team-scoped sharing
 CREATE TABLE IF NOT EXISTS team_members (
-    agent_id UUID NOT NULL,
-    team_id TEXT NOT NULL,
+    agent_id  UUID NOT NULL,
+    team_id   TEXT NOT NULL,
     joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (agent_id, team_id)
 );

@@ -14,12 +14,18 @@
       "extractionModel": { "type": "string" },
       "enableAuditLedger": { "type": "boolean", "default": true },
       "enableCommunityDetection": { "type": "boolean", "default": true },
+      "enablePromptRecall": { "type": "boolean", "default": true, "description": "Inject BrainClaw recall into the prompt so it becomes the primary durable memory source." },
+      "promptRecallTopK": { "type": "integer", "minimum": 1, "default": 4, "description": "How many BrainClaw memories to inject into prompt-time recall." },
+      "suppressMemoryBootstrap": { "type": "boolean", "default": true, "description": "Remove MEMORY.md from bootstrap prompt context while BrainClaw is the active memory slot." },
+      "captureAgentEnd": { "type": "boolean", "default": true, "description": "Capture durable assistant decisions/procedures at agent end using MEMORY.md-first backup then BrainClaw upsert." },
       "defaultTopK": { "type": "integer", "minimum": 1, "default": 8 },
       "pythonTimeoutMs": { "type": "integer", "default": 30000, "description": "Timeout for Python backend calls in milliseconds." },
       "pythonPath": { "type": "string", "default": "python3", "description": "Path to Python executable. Defaults to system python3. Use ${OPENCLAW_PYTHON} for env var." },
-      "pythonBackendPath": { "type": "string", "description": "Path to openclaw-memory Python package. Required for plugin operation. Use ${OPENCLAW_PYTHON_BACKEND} for env var." }
+      "pythonBackendPath": { "type": "string", "description": "Path to openclaw-memory Python package. Required for plugin operation. Use ${OPENCLAW_PYTHON_BACKEND} for env var." },
+      "brainclawSecret": { "type": "string", "sensitive": true, "description": "Shared secret for HMAC-signed identity tokens. Use ${BRAINCLAW_SECRET} for secrets." }
     },
-    "required": ["postgresUrl", "weaviateUrl", "neo4jUrl", "pythonBackendPath"]
+    "description": "All fields are optional at install time. Configure via Control UI after install, or use ${ENV_VAR} substitution."
+
   },
   "skills": ["./skills"]
 }

@@ -1,15 +1,23 @@
-"""OpenClaw Integration Module for BrainClaw Memory System.
+"""OpenClaw integration exports with lazy imports.
 
-This module provides the integration layer between the BrainClaw
-Memory System and OpenClaw's core.
+Keep package import light so helper submodules can be used without pulling
+optional runtime dependencies like asyncpg during unit tests.
 """
 
-from .openclaw_client import OpenClawMemoryClient
-from .session_context import SessionMemoryContext
-from .lcm_migration import LCMMigrationHandler
+__all__ = ["OpenClawMemoryClient", "SessionMemoryContext", "LCMMigrationHandler"]
 
-__all__ = [
-    "OpenClawMemoryClient",
-    "SessionMemoryContext",
-    "LCMMigrationHandler",
-]
+
+def __getattr__(name: str):
+    if name == "OpenClawMemoryClient":
+        from .openclaw_client import OpenClawMemoryClient
+
+        return OpenClawMemoryClient
+    if name == "SessionMemoryContext":
+        from .session_context import SessionMemoryContext
+
+        return SessionMemoryContext
+    if name == "LCMMigrationHandler":
+        from .lcm_migration import LCMMigrationHandler
+
+        return LCMMigrationHandler
+    raise AttributeError(name)

@@ -622,7 +622,8 @@ class ResultFusion:
         try:
             # Use PostgresClient's query method
             sql = """
-                SELECT id, content, memory_class, agent_id, visibility,
+                SELECT DISTINCT ON (agent_id, content)
+                       id, content, memory_class, agent_id, visibility_scope,
                        confidence, created_at, metadata
                 FROM memory_items
                 WHERE 1=1
@@ -636,11 +637,11 @@ class ResultFusion:
                 param_idx += 1
             
             if agent_id:
-                sql += f" AND (agent_id = ${param_idx} OR visibility IN ('team', 'tenant', 'public'))"
+                sql += f" AND (agent_id = ${param_idx} OR visibility_scope IN ('team', 'tenant', 'public'))"
                 params.append(agent_id)
                 param_idx += 1
             
-            sql += f" ORDER BY created_at DESC LIMIT ${param_idx}"
+            sql += f" ORDER BY agent_id, content, created_at DESC LIMIT ${param_idx}"
             params.append(limit)
             
             results = await self._postgres.query(sql, params)

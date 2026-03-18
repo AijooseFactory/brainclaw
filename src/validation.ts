@@ -43,10 +43,22 @@ export function warnIfPlaintextSecret(key: string, value: any): void {
  */
 const ALLOWED_ROUTING: Record<string, string[]> = {
   'retrieval': ['classify', 'retrieve_sync', 'get_retrieval_plan'],
-  'pipeline': ['ingest_event', 'determine_memory_class', 'chunk_content'],
+  'pipeline': ['ingest_event', 'determine_memory_class', 'chunk_content', 'extract_entities'],
+  'bridge_entrypoints': [
+    'ingest_event',
+    'retrieve_sync',
+    'classify',
+    'get_memory',
+    'check_contradictions',
+    'verify_audit_integrity',
+  ],
+  'graph.health': ['get_health_stats'],
   'graph.communities': ['detect_communities'],
   'graph.summarize': ['summarize_all'],
-  'audit.audit_log': ['verify_integrity']
+  'learning.auto_summarize': ['run_summarization', 'find_summarizable_memories'],
+  'learning.active_learning': ['record_retrieval', 'record_click', 'record_usage', 'apply_feedback'],
+  'embeddings': ['generate_embedding', 'generate_batch'],
+  'audit.audit_log': ['verify_integrity', 'log_access']
 };
 
 export function validateRouting(module: string, funct: string): boolean {

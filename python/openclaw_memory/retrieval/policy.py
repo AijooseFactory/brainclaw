@@ -103,19 +103,21 @@ RETRIEVAL_PLANS: Dict[Intent, RetrievalPlan] = {
     ),
     
     Intent.DECISION_RECALL: RetrievalPlan(
-        use_postgres=True,  # Primary - decisions table
+        use_postgres=True,  # Primary - canonical decision memories
         use_weaviate=False,
         use_neo4j=True,  # Graph traversal for decisions
         postgres_query={
-            "table": "decisions",
-            "status": "active",
+            "table": "memory_items",
+            "memory_class": "decision",
+            "is_current": True,
+            "status": "accepted",
             "order_by": "created_at",
             "order_desc": True
         },
         weaviate_params=None,
         cypher_query="""
             MATCH (d:Decision)
-            WHERE d.status = 'active'
+            WHERE d.status IN ['accepted', 'active'] AND coalesce(d.is_current, true) = true
             OPTIONAL MATCH (d)-[:SUPPORTED_BY]->(e)
             OPTIONAL MATCH (d)-[:DECIDED_ABOUT]->(entity)
             OPTIONAL MATCH (d)<-[:DECIDED_BY]-(u:User)

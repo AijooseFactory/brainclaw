@@ -22,7 +22,7 @@ MIGRATIONS_TABLE = "schema_migrations"
 
 def get_connection():
     """Get a PostgreSQL connection from environment."""
-    url = os.environ.get("POSTGRESQL_URL") or os.environ.get("DATABASE_URL")
+    url = os.environ.get("POSTGRES_URL") or os.environ.get("POSTGRESQL_URL") or os.environ.get("DATABASE_URL")
     if not url:
         raise RuntimeError(
             "POSTGRESQL_URL or DATABASE_URL environment variable is required."

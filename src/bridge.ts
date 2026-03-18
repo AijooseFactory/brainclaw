@@ -11,6 +11,42 @@ const __dirname = path.dirname(__filename);
 
 import * as crypto from "crypto";
 
+function optionalContextValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function canonicalTokenSegment(value: string | undefined): string {
+  return value ?? "";
+}
+
+function parseBackendJsonOutput(stdout: string): any {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    throw new Error("Python backend returned empty output");
+  }
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const lines = trimmed
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      const candidate = lines[index];
+      if (!candidate.startsWith("{") && !candidate.startsWith("[")) {
+        continue;
+      }
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        // Continue scanning for the last valid JSON payload.
+      }
+    }
+    throw new Error(`Failed to parse Python output: ${stdout}`);
+  }
+}
+
 /**
  * Internal reference that can be overridden for tests.
  */
@@ -101,18 +137,30 @@ export async function callPythonBackend(
     }
 
     const agentContext = {
-      agentId: ctx.agentId || 'agent-unknown',
-      agentName: ctx.agentName || 'unknown',
-      teamId: ctx.teamId || 'team-default',
-      tenantId: config.tenantId || process.env.OPENCLAW_TENANT_ID || 'tenant-default',
+      agentId: optionalContextValue(ctx.agentId),
+      agentName: optionalContextValue(ctx.agentName),
+      teamId: optionalContextValue(ctx.teamId),
+      tenantId:
+        optionalContextValue(ctx.tenantId) ||
+        optionalContextValue(config.tenantId) ||
+        optionalContextValue(process.env.OPENCLAW_TENANT_ID),
       timestamp: Date.now()
     };
-    
-    const message = `${agentContext.agentId}:${agentContext.agentName}:${agentContext.teamId}:${agentContext.tenantId}:${agentContext.timestamp}`;
+
+    const message = [
+      canonicalTokenSegment(agentContext.agentId),
+      canonicalTokenSegment(agentContext.agentName),
+      canonicalTokenSegment(agentContext.teamId),
+      canonicalTokenSegment(agentContext.tenantId),
+      String(agentContext.timestamp),
+    ].join(":");
     const hmac = crypto.createHmac('sha256', brainclawSecret);
     hmac.update(message);
     const signature = hmac.digest('hex');
-    const identityToken = Buffer.from(JSON.stringify({ ...agentContext, signature })).toString('base64');
+    const identityPayload = Object.fromEntries(
+      Object.entries(agentContext).filter(([, value]) => value !== undefined),
+    );
+    const identityToken = Buffer.from(JSON.stringify({ ...identityPayload, signature })).toString('base64');
 
     const bridgeScript = `
 import sys
@@ -166,9 +214,9 @@ except Exception as e:
       BRAINCLAW_SECRET: brainclawSecret,
       
       // Legacy context (for backwards compatibility during migration)
-      AGENT_ID: agentContext.agentId,
-      AGENT_NAME: agentContext.agentName,
-      TEAM_ID: agentContext.teamId,
+      ...(agentContext.agentId ? { AGENT_ID: agentContext.agentId } : {}),
+      ...(agentContext.agentName ? { AGENT_NAME: agentContext.agentName } : {}),
+      ...(agentContext.teamId ? { TEAM_ID: agentContext.teamId } : {}),
       
       // Pass the backend path explicitly to sys.path
       OPENCLAW_PYTHON_BACKEND: pythonBackendPath
@@ -211,7 +259,7 @@ except Exception as e:
         reject(error);
       } else {
         try {
-          const parsedResult = JSON.parse(stdout);
+          const parsedResult = parseBackendJsonOutput(stdout);
           if (parsedResult.error) {
             const error = new Error(sanitizeError(parsedResult.error));
             const classified = logger.error('bridge', 'pythonError', error, { module, funct });
@@ -222,7 +270,8 @@ except Exception as e:
             resolve(parsedResult);
           }
         } catch (e) {
-          const error = new Error(sanitizeError(`Failed to parse Python output: ${stdout}`));
+          const message = e instanceof Error ? e.message : `Failed to parse Python output: ${stdout}`;
+          const error = new Error(sanitizeError(message));
           const classified = logger.error('bridge', 'parseError', error, { module, funct });
           logger.timing('bridge', 'callPythonBackend', duration, { module, funct, result: 'error' });
           reject(error);

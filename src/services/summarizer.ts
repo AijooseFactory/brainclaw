@@ -16,7 +16,7 @@ export const summarizerService = {
       try {
         logger.debug('summarizer', 'run', 'Running community summarization pass');
         await callPythonBackend("graph.summarize", "summarize_all", {
-          tenant_id: config.tenantId || process.env.OPENCLAW_TENANT_ID || 'tenant-default'
+          tenant_id: config.tenantId || process.env.OPENCLAW_TENANT_ID
         }, config, ctx);
         logger.info('summarizer', 'run', 'Community summarization pass complete');
       } catch (error: any) {

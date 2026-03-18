@@ -1,7 +1,7 @@
 """
 LCM Export Service - READ-ONLY export from Lossless Context Management.
 
-This service exports LCM data without modifying anything in the ajf-openclaw container.
+This service exports LCM data without modifying the running OpenClaw instance.
 All operations are read-only.
 """
 

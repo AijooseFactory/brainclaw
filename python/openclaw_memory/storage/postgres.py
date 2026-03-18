@@ -3,7 +3,7 @@ import asyncpg
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List, Any
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 import json
 import time
 import warnings
@@ -20,6 +20,8 @@ except ImportError:
 
 # Get logger
 logger = get_logger("openclaw.storage.postgres") if _OBSERVABILITY_AVAILABLE else None
+
+BRAINCLAW_NS = UUID("b4a1bc1a-0000-4000-a000-b4a1bc1ab000")
 
 
 class _FakeSpan:
@@ -39,6 +41,23 @@ class _FakeSpan:
     
     def record_exception(self, exc):
         pass
+
+
+def _coerce_identity_uuid(value: Optional[Any]) -> Optional[UUID]:
+    """Normalize OpenClaw identity strings into stable UUIDs for storage."""
+    if value is None:
+        return None
+    if isinstance(value, UUID):
+        return value
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    try:
+        return UUID(text)
+    except ValueError:
+        return uuid5(BRAINCLAW_NS, text)
 
 
 @dataclass
@@ -96,7 +115,7 @@ class MemoryItem:
                 from openclaw_memory.security.access_control import get_current_agent_id
                 current_agent_id = get_current_agent_id()
                 if current_agent_id:
-                    self.agent_id = UUID(current_agent_id)
+                    self.agent_id = _coerce_identity_uuid(current_agent_id)
             except Exception:
                 pass
 
@@ -106,7 +125,7 @@ class MemoryItem:
                 from openclaw_memory.security.access_control import get_current_tenant_id
                 current_tenant_id = get_current_tenant_id()
                 if current_tenant_id:
-                    self.tenant_id = UUID(current_tenant_id)
+                    self.tenant_id = _coerce_identity_uuid(current_tenant_id)
             except Exception:
                 pass
     
@@ -311,6 +330,83 @@ class PostgresClient:
             if row:
                 return self._row_to_memory_item(row)
             return None
+
+    async def query(
+        self,
+        sql_or_query: str,
+        params: Optional[List[Any]] = None,
+        limit: Optional[int] = None,
+    ) -> List[asyncpg.Record]:
+        """Execute raw SQL or a text-search fallback query against memory_items."""
+        if not sql_or_query:
+            return []
+
+        params = list(params or [])
+        is_sql = sql_or_query.lstrip().upper().startswith(
+            ("SELECT", "WITH", "UPDATE", "INSERT", "DELETE")
+        )
+
+        async with self._pool.acquire() as conn:
+            from openclaw_memory.security.access_control import set_db_session_context
+
+            await set_db_session_context(conn)
+
+            if is_sql:
+                return await conn.fetch(sql_or_query, *params)
+
+            text_limit = limit or 10
+            text_query = """
+                SELECT DISTINCT ON (agent_id, content)
+                       id, content, memory_class, agent_id, visibility_scope,
+                       confidence, created_at, metadata
+                FROM memory_items
+                WHERE is_current = TRUE
+                  AND content ILIKE $1
+                ORDER BY agent_id, content, created_at DESC
+                LIMIT $2
+            """
+            return await conn.fetch(text_query, f"%{sql_or_query}%", text_limit)
+
+    async def get_agent_memories(
+        self,
+        agent_id: Optional[str] = None,
+        memory_class: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[MemoryItem]:
+        """Get current memories visible to a specific agent."""
+        conditions = ["is_current = TRUE"]
+        params: List[Any] = []
+        param_idx = 1
+
+        canonical_agent_id = _coerce_identity_uuid(agent_id)
+        if canonical_agent_id:
+            conditions.append(
+                f"(agent_id = ${param_idx} OR visibility_scope IN ('team', 'tenant', 'public'))"
+            )
+            params.append(canonical_agent_id)
+            param_idx += 1
+
+        if memory_class:
+            conditions.append(f"memory_class = ${param_idx}")
+            params.append(memory_class)
+            param_idx += 1
+
+        params.append(limit)
+
+        query = f"""
+            SELECT DISTINCT ON (agent_id, content) *
+            FROM memory_items
+            WHERE {' AND '.join(conditions)}
+            ORDER BY agent_id, content, created_at DESC
+            LIMIT ${param_idx}
+        """
+
+        async with self._pool.acquire() as conn:
+            from openclaw_memory.security.access_control import set_db_session_context
+
+            await set_db_session_context(conn)
+            rows = await conn.fetch(query, *params)
+            return [self._row_to_memory_item(row) for row in rows]
     
     async def search_memory_items(
         self,
@@ -437,18 +533,36 @@ class PostgresClient:
                 # Create new item based on original
                 insert_query = """
                     INSERT INTO memory_items (
-                        tenant_id, memory_class, memory_type, content,
-                        confidence, valid_from, is_current, superseded_by,
-                        visibility_scope, source_session_id, source_message_id
+                        tenant_id, agent_id, memory_class, memory_type, status,
+                        content, source_message_id, source_session_id,
+                        source_tool_call_id, extracted_by, extraction_method,
+                        extraction_timestamp, extractor_name, extractor_version,
+                        extraction_confidence, extraction_metadata, confidence,
+                        user_confirmed, user_confirmed_at, user_confirmed_by,
+                        valid_from, valid_to, is_current, superseded_by,
+                        supersession_reason, visibility_scope, access_control,
+                        retention_policy, retention_until, weaviate_id,
+                        neo4j_id, weaviate_synced, neo4j_synced,
+                        weaviate_synced_at, neo4j_synced_at, sync_version,
+                        metadata
                     )
-                    SELECT 
-                        tenant_id, agent_id, memory_class, memory_type, $2,
-                        COALESCE($3, confidence), NOW(), TRUE, $1,
-                        visibility_scope, source_session_id, source_message_id
+                    SELECT
+                        tenant_id, agent_id, memory_class, memory_type, status,
+                        $2, source_message_id, source_session_id,
+                        source_tool_call_id, extracted_by, extraction_method,
+                        NOW(), COALESCE(extractor_name, extracted_by, 'brainclaw'),
+                        COALESCE(extractor_version, '1.3.0'),
+                        extraction_confidence, COALESCE(extraction_metadata, '{}'::jsonb),
+                        COALESCE($3, confidence), user_confirmed,
+                        user_confirmed_at, user_confirmed_by, NOW(), NULL,
+                        TRUE, $1, $4, visibility_scope,
+                        COALESCE(access_control, '{}'::jsonb), retention_policy,
+                        retention_until, NULL, NULL, FALSE, FALSE, NULL, NULL,
+                        COALESCE(sync_version, 1) + 1, COALESCE(metadata, '{}'::jsonb)
                     FROM memory_items WHERE id = $1
                     RETURNING *
                 """
-                row = await conn.fetchrow(insert_query, original_id, new_content, new_confidence)
+                row = await conn.fetchrow(insert_query, original_id, new_content, new_confidence, reason)
                 
                 # Update original's superseded_by reference
                 ref_update_query = """

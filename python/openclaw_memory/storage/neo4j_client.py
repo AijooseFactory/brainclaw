@@ -405,7 +405,7 @@ class Neo4jClient:
     - Graph traversal queries for relationship retrieval
     - Constraint and index management
     
-    Uses Neo4j Desktop database: ajf-openclaw-graphdb
+    Uses the configured Neo4j database for relationship storage.
     """
     
     def __init__(
@@ -413,7 +413,7 @@ class Neo4jClient:
         uri: str = "bolt://localhost:7687",
         user: str = "neo4j",
         password: str = "",
-        database: str = "ajf-openclaw-graphdb",
+        database: str = "neo4j",
         max_connection_pool_size: int = 50,
     ):
         self.uri = uri
