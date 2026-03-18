@@ -897,7 +897,7 @@ class AgentIsolationPolicy:
     Agent-specific memory isolation and access control.
 
     Provides methods for:
-    - Checking if agent is the coordinator (Albert)
+    - Checking if agent is the coordinator
     - Checking if memory is private to an agent
     - Determining if an agent can access a memory
     - Promoting agent memory to team-shared
@@ -906,16 +906,17 @@ class AgentIsolationPolicy:
     Privacy Rules:
     - Agent-private: only the owner can access
     - Team-shared: accessible to all team members
-    - Coordinator (Albert) cannot see other agents' private memories by default
+    - Coordinator cannot see other agents' private memories by default
     - Memories must be explicitly shared to be visible across agents
     """
 
-    # Coordinator agent ID - Albert has full team visibility
-    COORDINATOR_ID = 'agent-albert-uuid'
+    # Coordinator agent ID (populated from config/environment)
+    from ..config import COORDINATOR_AGENT_ID
+    COORDINATOR_ID = COORDINATOR_AGENT_ID
 
     def is_coordinator(self, agent_id: str) -> bool:
         """
-        Check if agent is the coordinator (Albert).
+        Check if agent is the coordinator.
 
         The coordinator has visibility into all team members' private memories,
         in addition to standard team+own access.
@@ -951,7 +952,7 @@ class AgentIsolationPolicy:
         """
         Check if agent can access this memory.
 
-        Coordinator Exception: Albert (coordinator) can access all team members'
+        Coordinator Exception: The coordinator can access all team members'
         private memories in addition to standard visibility rules.
 
         Args:
@@ -975,7 +976,7 @@ class AgentIsolationPolicy:
             return True
 
         # Agent-private: only the owner can access
-        # Even coordinator (Albert) cannot see other agents' private memories by default
+        # Even the coordinator cannot see other agents' private memories by default
         if visibility == "agent":
             if agent_id_field is None:
                 return True  # No agent_id means it's not agent-specific

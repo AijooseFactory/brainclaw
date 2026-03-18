@@ -10,7 +10,7 @@ RRF_K_RANGE = (1, 100)  # Valid range for RRF k constant
 RRF_MAX_RESULTS = 50  # Maximum results to consider from each source
 
 
-# Pre-defined team constants for Ai Joose Factory
+# Pre-defined team constants for OpenClaw
 # Environment-driven identity defaults
 OPENCLAW_TENANT_ID = os.getenv("OPENCLAW_TENANT_ID", "tenant-default")
 
@@ -19,22 +19,11 @@ team_members_env = os.getenv("OPENCLAW_TEAM_MEMBERS")
 if team_members_env:
     TEAM_MEMBER_IDS = tuple(id.strip() for id in team_members_env.split(",") if id.strip())
 else:
-    # Legacy/Default team for backward compatibility
-    TEAM_MEMBER_IDS = (
-        "agent-albert-uuid",
-        "agent-einstein-uuid",
-        "agent-blackwell-uuid",
-        "agent-babatunde-uuid",
-        "agent-zeke-uuid",
-    )
+    # Default empty team, should be populated via environment
+    TEAM_MEMBER_IDS = ()
 
-# Backward compatibility aliases (deprecated)
-ALBERT_AGENT_ID = TEAM_MEMBER_IDS[0]
-EINSTEIN_AGENT_ID = TEAM_MEMBER_IDS[1] if len(TEAM_MEMBER_IDS) > 1 else "agent-einstein-uuid"
-BLACKWELL_AGENT_ID = TEAM_MEMBER_IDS[2] if len(TEAM_MEMBER_IDS) > 2 else "agent-blackwell-uuid"
-BABATUNDE_AGENT_ID = TEAM_MEMBER_IDS[3] if len(TEAM_MEMBER_IDS) > 3 else "agent-babatunde-uuid"
-ZEKE_AGENT_ID = TEAM_MEMBER_IDS[4] if len(TEAM_MEMBER_IDS) > 4 else "agent-zeke-uuid"
-
+# Identity Constants (Environment-defined)
+COORDINATOR_AGENT_ID = os.getenv("OPENCLAW_COORDINATOR_ID", "")
 AI_JOOSE_FACTORY_TEAM_MEMBERS = TEAM_MEMBER_IDS
 AI_JOOSE_FACTORY_TENANT_ID = OPENCLAW_TENANT_ID
 
@@ -74,26 +63,15 @@ class AgentConfig:
         # Basic identification
         agent_id = get_env("AGENT_ID")
         
-        # Fallback for specific legacy names if environment isn't set
-        if not agent_id and agent_name.lower() == "albert":
-            agent_id = ALBERT_AGENT_ID
-        elif not agent_id and agent_name.lower() == "einstein":
-            agent_id = EINSTEIN_AGENT_ID
-            
+        # Basic identification
+        agent_id = get_env("AGENT_ID")
+        
         if not agent_id:
             agent_id = f"agent-{agent_name.lower()}-uuid" if agent_name else "agent-unknown"
 
         role = get_env("AGENT_ROLE")
         if not role:
-            # Legacy role mapping
-            roles = {
-                "albert": "TPM / Coordinator",
-                "einstein": "Senior Software Engineer",
-                "blackwell": "QA / Test Engineer",
-                "babatunde": "Security / Compliance Engineer",
-                "zeke": "DevOps / SRE"
-            }
-            role = roles.get(agent_name.lower(), "Assistant")
+            role = "Assistant"
 
         team_id = get_env("TEAM_ID", "default-team")
         
