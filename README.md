@@ -12,9 +12,16 @@ BrainClaw is a Hardened Hybrid GraphRAG Plugin for OpenClaw with Multi-Agent Iso
 
 ## Installation
 
-### 1. Install Python Dependencies
+### 1. Install Dependencies & Build
+
+BrainClaw requires both Node.js (for the Gateway plugin) and Python (for the RAG backend).
 
 ```bash
+# Install Node dependencies and build the plugin
+npm install
+npm run build
+
+# Install Python backend dependencies
 pip install -r requirements.txt
 ```
 
