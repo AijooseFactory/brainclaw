@@ -29,7 +29,8 @@ export async function callPythonBackend(
   module: string, 
   funct: string, 
   params: any, 
-  config: Record<string, any> = {}
+  config: Record<string, any> = {},
+  ctx: any = {}
 ): Promise<any> {
   const startTime = Date.now();
   const logger = getLogger();
@@ -113,7 +114,28 @@ except Exception as e:
     sys.exit(1)
 `;
 
-    const pythonProcess = spawnInstance(pythonExecutable, ["-c", bridgeScript, JSON.stringify(params)]);
+    // Prepare environment variables for the Python process
+    // This allows BrainClaw to be 100% adaptive to OpenClaw configurations
+    const pythonEnv = {
+      ...process.env,
+      // Map OpenClaw config to backend expectations
+      POSTGRES_URL: config.postgresUrl || process.env.POSTGRES_URL,
+      WEAVIATE_URL: config.weaviateUrl || process.env.WEAVIATE_URL,
+      NEO4J_URL: config.neo4jUrl || process.env.NEO4J_URL,
+      NEO4J_PASSWORD: config.neo4jPassword || process.env.NEO4J_PASSWORD,
+      
+      // Inject OpenClaw Agent Context
+      AGENT_ID: ctx.agentId || process.env.AGENT_ID || 'agent-unknown',
+      AGENT_NAME: ctx.agentName || process.env.AGENT_NAME || 'unknown',
+      TEAM_ID: config.teamId || process.env.TEAM_ID || 'team-default',
+      
+      // Pass the backend path explicitly to sys.path
+      OPENCLAW_PYTHON_BACKEND: pythonBackendPath
+    };
+
+    const pythonProcess = spawnInstance(pythonExecutable, ["-c", bridgeScript, JSON.stringify(params)], {
+      env: pythonEnv
+    });
 
     // 4. Resource Management: Lifecycle & Timeout
     const timeoutMs = config.pythonTimeoutMs || 30000;

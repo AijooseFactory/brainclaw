@@ -25,7 +25,7 @@ export const searchTool = {
       // 1. Classify intent (needed for the retrieve function)
       const classification = await callPythonBackend("retrieval", "classify", { 
         query: params.query 
-      }, config);
+      }, config, ctx);
 
       // 2. Execute retrieval
       const results = await callPythonBackend("retrieval", "retrieve_sync", {
@@ -33,7 +33,7 @@ export const searchTool = {
         intent: classification, 
         tenant_id: params.tenant_id || "default",
         limit: params.topK || 8
-      }, config);
+      }, config, ctx);
 
       return {
         content: [

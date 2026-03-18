@@ -29,7 +29,7 @@ export const ingestTool = {
       // Call the ingestion pipeline in Python
       const result = await callPythonBackend("pipeline", "ingest_event", {
         event: event
-      }, config);
+      }, config, ctx);
 
       return {
         content: [

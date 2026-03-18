@@ -17,14 +17,14 @@ export const contradictionCheckTool = {
       // Retrieve relevant memories for checking contradictions
       const query = params.entity_name ? `What are the claims about ${params.entity_name}?` : "Are there any contradictions in current memories?";
       
-      const classification = await callPythonBackend("retrieval", "classify", { query }, config);
+      const classification = await callPythonBackend("retrieval", "classify", { query }, config, ctx);
       
       const results = await callPythonBackend("retrieval", "retrieve_sync", {
         query: query,
         intent: classification,
         tenant_id: params.tenant_id || "default",
         limit: 20
-      }, config);
+      }, config, ctx);
 
       // Placeholder for real contradiction detection logic
       // This could be an LLM call to compare the retrieved results

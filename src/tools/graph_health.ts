@@ -14,7 +14,7 @@ export const graphHealthTool = {
     const config = ctx.config || {};
     try {
       // Placeholder for real health check logic in Python
-      // In a real implementation: const health = await callPythonBackend("graph.health", "get_health_stats", params, config);
+      // In a real implementation: const health = await callPythonBackend("graph.health", "get_health_stats", params, config, ctx);
       
       return {
         content: [

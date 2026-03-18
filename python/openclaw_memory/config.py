@@ -120,6 +120,22 @@ class PostgresConfig:
     max_pool_size: int = 20
     
     @classmethod
+    def from_url(cls, url: str) -> "PostgresConfig":
+        """Parse PostgreSQL URL into config."""
+        try:
+            from urllib.parse import urlparse
+            p = urlparse(url)
+            return cls(
+                host=p.hostname or "localhost",
+                port=p.port or 5432,
+                database=p.path.lstrip('/') or "openclaw_memory",
+                user=p.username or "openclaw",
+                password=p.password or "openclaw_secret",
+            )
+        except Exception:
+            return cls.from_env()
+
+    @classmethod
     def from_env(cls) -> "PostgresConfig":
         return cls(
             host=os.getenv("POSTGRES_HOST", "localhost"),
@@ -145,6 +161,21 @@ class WeaviateConfig:
     def url(self) -> str:
         return f"http://{self.host}:{self.port}"
     
+    @classmethod
+    def from_url(cls, url: str) -> "WeaviateConfig":
+        """Parse Weaviate URL into config."""
+        try:
+            from urllib.parse import urlparse
+            p = urlparse(url)
+            return cls(
+                host=p.hostname or "localhost",
+                port=p.port or 8080,
+                grpc_port=int(os.getenv("WEAVIATE_GRPC_PORT", "50051")),
+                api_key=os.getenv("WEAVIATE_API_KEY"),
+            )
+        except Exception:
+            return cls.from_env()
+
     @classmethod
     def from_env(cls) -> "WeaviateConfig":
         return cls(
@@ -172,6 +203,22 @@ class Neo4jConfig:
     password: str = ""  # Must be set via NEO4J_PASSWORD env var
     database: str = "ajf-openclaw-graphdb"
     
+    @classmethod
+    def from_url(cls, url: str) -> "Neo4jConfig":
+        """Parse Neo4j URL into config."""
+        try:
+            from urllib.parse import urlparse
+            p = urlparse(url)
+            # Neo4j URLs often include credentials
+            return cls(
+                uri=f"{p.scheme}://{p.hostname}:{p.port}" if p.hostname else url,
+                user=p.username or "neo4j",
+                password=p.password or os.getenv("NEO4J_PASSWORD", ""),
+                database=os.getenv("NEO4J_DATABASE", "ajf-openclaw-graphdb"),
+            )
+        except Exception:
+            return cls.from_env()
+
     @classmethod
     def from_env(cls) -> "Neo4jConfig":
         return cls(
@@ -292,10 +339,15 @@ class OpenClawMemoryConfig:
     @classmethod
     def from_env(cls) -> "OpenClawMemoryConfig":
         """Create config from environment variables."""
+        # Prioritize dynamic injections from the bridge
+        postgres_url = os.getenv("POSTGRES_URL")
+        weaviate_url = os.getenv("WEAVIATE_URL")
+        neo4j_url = os.getenv("NEO4J_URL")
+        
         return cls(
-            postgres=PostgresConfig.from_env(),
-            weaviate=WeaviateConfig.from_env(),
-            neo4j=Neo4jConfig.from_env(),
+            postgres=PostgresConfig.from_url(postgres_url) if postgres_url else PostgresConfig.from_env(),
+            weaviate=WeaviateConfig.from_url(weaviate_url) if weaviate_url else WeaviateConfig.from_env(),
+            neo4j=Neo4jConfig.from_url(neo4j_url) if neo4j_url else Neo4jConfig.from_env(),
             agent_id=os.getenv('AGENT_ID', 'agent-unknown'),
             agent_name=os.getenv('AGENT_NAME', 'unknown'),
             team_id=os.getenv('TEAM_ID', 'team-default'),
