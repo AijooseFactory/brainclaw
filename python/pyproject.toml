@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openclaw-memory"
 version = "0.1.0"
-description = "BrainClaw is a Hybrid GraphRAG for OpenClaw"
+description = "A Hybrid GraphRAG Plugin for OpenClaw"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}

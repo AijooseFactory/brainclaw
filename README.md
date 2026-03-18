@@ -1,6 +1,6 @@
 # BrainClaw Plugin v1.2.1
 
-BrainClaw is a Hybrid GraphRAG for OpenClaw
+A Hybrid GraphRAG Plugin for OpenClaw
 
 ## Features
 

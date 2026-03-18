@@ -1,7 +1,7 @@
 {
   "name": "brainclaw",
   "version": "1.2.0",
-  "description": "BrainClaw is a Hybrid GraphRAG for OpenClaw",
+  "description": "A Hybrid GraphRAG Plugin for OpenClaw",
   "type": "module",
   "openclaw": {
     "extensions": [
