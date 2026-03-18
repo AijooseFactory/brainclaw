@@ -1,6 +1,6 @@
 # BrainClaw Plugin v1.2.1
 
-BrainClaw Memory System for OpenClaw with Hierarchical Community Detection and Immutable Audit Ledger.
+BrainClaw is a Hybrid GraphRAG for OpenClaw
 
 ## Features
 

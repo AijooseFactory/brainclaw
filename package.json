@@ -1,7 +1,7 @@
 {
   "name": "brainclaw",
   "version": "1.2.0",
-  "description": "BrainClaw: Advanced BrainClaw for OpenClaw with Hierarchical Community Detection and Immutable Audit Ledger.",
+  "description": "BrainClaw is a Hybrid GraphRAG for OpenClaw",
   "type": "module",
   "openclaw": {
     "extensions": [
