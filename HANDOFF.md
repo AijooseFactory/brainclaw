@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-19
 > Repo branch: `main`
-> Repo HEAD: `4400a2f269610cb9e150a58c26334166cceee573`
+> Verify exact SHA live with: `git rev-parse HEAD`
 > Live OpenClaw mount: `./brainclaw-sync -> /home/node/.openclaw/extensions/brainclaw`
 
 ## Read This First
@@ -14,9 +14,8 @@ If you are verifying or changing BrainClaw, use one of these two paths:
 - agent-visible repo: `/home/node/Mac/data/usr/projects/ai_joose_factory/packages/brainclaw`
 - live mounted plugin: `/home/node/.openclaw/extensions/brainclaw`
 
-Both paths were verified on 2026-03-19 and both resolve to the same commit:
-
-- `4400a2f269610cb9e150a58c26334166cceee573`
+Both paths were verified on 2026-03-19 and both resolved to the same commit at verification time.
+Re-run `git rev-parse HEAD` in both paths before relying on a commit-specific claim.
 
 Do not inspect `/app/src` or `/app/package.json` and assume those files describe BrainClaw. `/app` is OpenClaw core.
 
@@ -34,6 +33,7 @@ If a report mixes those values together, the report is wrong.
 
 Current `main` history relevant to continuation work:
 
+- `9339e2d` `docs: align handoff commit references`
 - `4400a2f` `docs: correct brainclaw handoff and verification guidance`
 - `022138c` `fix: suppress env-backed secret warnings`
 - `adf97cc` `Update HANDOFF.md`
