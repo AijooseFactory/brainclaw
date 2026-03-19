@@ -542,9 +542,16 @@ class InMemoryLosslessRepository:
 class LosslessClawSyncEngine:
     """Orchestrates canonical import, candidate extraction, and replay-safe promotion."""
 
-    def __init__(self, adapter: LosslessClawAdapter | None, repository: CanonicalLosslessRepository):
+    def __init__(
+        self,
+        adapter: LosslessClawAdapter | None,
+        repository: CanonicalLosslessRepository,
+        identity_context: dict[str, Any] | None = None,
+    ):
         self.adapter = adapter
         self.repository = repository
+        # FR-022/023: Identity context for ACL/scope field population
+        self._identity = identity_context or {}
 
     def sync(self, mode: str = "incremental") -> dict[str, Any]:
         if self.adapter is None:
@@ -736,15 +743,17 @@ class LosslessClawSyncEngine:
             "verification_result": "unavailable",
             "compatibility_state": report["compatibility_state"],
             "reason_code": report.get("reason_code"),
-            "workspace_id": None,
-            "agent_id": None,
+            "workspace_id": self._identity.get("workspace_id"),
+            "agent_id": self._identity.get("agent_id"),
             "session_id": summary["source_session_id"],
-            "project_id": None,
-            "user_id": None,
-            "visibility_scope": "owner",
-            "owner_id": None,
+            "project_id": self._identity.get("project_id"),
+            "user_id": self._identity.get("user_id"),
+            "visibility_scope": self._identity.get("visibility_scope", "owner"),
+            "owner_id": self._identity.get("owner_id"),
             "statefulness": statefulness,
-            "access_control": {"write_policy": "owner_only"},
+            "access_control": self._identity.get(
+                "access_control", {"write_policy": "owner_only"}
+            ),
             "import_status": "imported",
             "import_error": None,
             "imported_at": _utcnow().isoformat(),

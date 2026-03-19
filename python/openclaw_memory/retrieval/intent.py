@@ -10,13 +10,18 @@ from typing import List, Dict, Tuple
 
 
 class Intent(str, Enum):
-    """Supported intent types for memory retrieval."""
+    """Supported intent types for memory retrieval (FR-021)."""
     FACT_LOOKUP = "fact_lookup"
     DECISION_RECALL = "decision_recall"
     RELATIONSHIP_QUERY = "relationship_query"
     CHANGE_DETECTION = "change_detection"
     OWNERSHIP_QUERY = "ownership_query"
     PROCEDURAL_RECALL = "procedural_recall"
+    # FR-021 additions:
+    ISSUE_EVENT_RECALL = "issue_event_recall"
+    PREFERENCE_CONSTRAINT_RECALL = "preference_constraint_recall"
+    CONTRADICTION_REVIEW = "contradiction_review"
+    DRILL_DOWN_REQUEST = "drill_down_request"
 
 
 @dataclass
@@ -25,6 +30,7 @@ class ClassificationResult:
     primary_intent: Intent
     confidence: float
     all_intents: List[Tuple[Intent, float]] = field(default_factory=list)
+    route_log: str = ""  # FR-021: observable route selection
 
 
 # Intent patterns based on spec
@@ -94,6 +100,48 @@ INTENT_PATTERNS: Dict[Intent, List[str]] = {
         r'\btutorial\b',
         r'\b guide\b',
     ],
+    # FR-021 additions:
+    Intent.ISSUE_EVENT_RECALL: [
+        r'\bwhat issue\b',
+        r'\bwhat error\b',
+        r'\bwhat bug\b',
+        r'\bwhat happened\b',
+        r'\bwhat event\b',
+        r'\bwhat problem\b',
+        r'\bincident\b',
+        r'\bfailure\b',
+        r'\bissue with\b',
+    ],
+    Intent.PREFERENCE_CONSTRAINT_RECALL: [
+        r'\bwhat.*prefer\b',
+        r'\bpreference for\b',
+        r'\bconstraint on\b',
+        r'\brule about\b',
+        r'\bmust not\b',
+        r'\brequired to\b',
+        r'\bnever.*should\b',
+        r'\balways.*must\b',
+        r'\bguideline\b',
+    ],
+    Intent.CONTRADICTION_REVIEW: [
+        r'\bcontradiction\b',
+        r'\bconflict.*with\b',
+        r'\binconsisten\b',
+        r'\bdisagree\b',
+        r'\bcontradicts\b',
+        r'\bopposite of\b',
+        r'\bpreviously said\b',
+    ],
+    Intent.DRILL_DOWN_REQUEST: [
+        r'\btell me more\b',
+        r'\bexpand on\b',
+        r'\bdetails about\b',
+        r'\bmore detail\b',
+        r'\bdrill down\b',
+        r'\bfull context\b',
+        r'\boriginal conversation\b',
+        r'\bsource of\b',
+    ],
 }
 
 # Additional context words that can boost confidence
@@ -112,6 +160,18 @@ INTENT_BOOSTERS: Dict[Intent, List[str]] = {
     ],
     Intent.PROCEDURAL_RECALL: [
         'how', 'steps', 'process', 'procedure', 'method', 'guide', 'tutorial'
+    ],
+    Intent.ISSUE_EVENT_RECALL: [
+        'issue', 'bug', 'error', 'problem', 'incident', 'failure', 'event', 'happened'
+    ],
+    Intent.PREFERENCE_CONSTRAINT_RECALL: [
+        'prefer', 'preference', 'constraint', 'rule', 'must', 'never', 'always', 'guideline'
+    ],
+    Intent.CONTRADICTION_REVIEW: [
+        'contradiction', 'conflict', 'inconsistent', 'disagree', 'opposite'
+    ],
+    Intent.DRILL_DOWN_REQUEST: [
+        'expand', 'detail', 'more', 'drill', 'source', 'original', 'context'
     ],
 }
 
@@ -189,10 +249,17 @@ class IntentClassifier:
         # Format all intents as tuples
         all_intents = [(intent, score) for intent, score in sorted_intents]
         
+        # FR-021: Log route selection for observability and testability
+        route_log = (
+            f"intent={primary_intent.value} confidence={confidence:.3f} "
+            f"candidates={len(sorted_intents)} query_len={len(query)}"
+        )
+
         return ClassificationResult(
             primary_intent=primary_intent,
             confidence=confidence,
-            all_intents=all_intents
+            all_intents=all_intents,
+            route_log=route_log,
         )
     
     def classify_multiple(self, query: str, top_k: int = 2) -> List[Tuple[Intent, float]]:
