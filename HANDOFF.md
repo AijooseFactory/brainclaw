@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-19
 > Repo branch: `main`
-> Repo HEAD: `022138c2eb64893d526d28a4059b80f731e62ad9`
+> Repo HEAD: `4400a2f269610cb9e150a58c26334166cceee573`
 > Live OpenClaw mount: `./brainclaw-sync -> /home/node/.openclaw/extensions/brainclaw`
 
 ## Read This First
@@ -16,7 +16,7 @@ If you are verifying or changing BrainClaw, use one of these two paths:
 
 Both paths were verified on 2026-03-19 and both resolve to the same commit:
 
-- `022138c2eb64893d526d28a4059b80f731e62ad9`
+- `4400a2f269610cb9e150a58c26334166cceee573`
 
 Do not inspect `/app/src` or `/app/package.json` and assume those files describe BrainClaw. `/app` is OpenClaw core.
 
@@ -34,6 +34,7 @@ If a report mixes those values together, the report is wrong.
 
 Current `main` history relevant to continuation work:
 
+- `4400a2f` `docs: correct brainclaw handoff and verification guidance`
 - `022138c` `fix: suppress env-backed secret warnings`
 - `adf97cc` `Update HANDOFF.md`
 - `9d263b3` `docs: broaden handoff to full brainclaw project`
