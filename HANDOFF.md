@@ -197,15 +197,10 @@ Command:
 
 Result on 2026-03-19:
 
-- `56` tests passed
-- `8` failed
+- `64` tests passed
+- `0` failed
 
-Those host-side failures were environment-related:
-
-- missing async test support on the host Python environment
-- missing `asyncpg` on the host Python environment
-
-That host failure is not evidence that the live plugin is broken. The container runtime test is the relevant operational check.
+At the time of this handoff, the host-side checkout and the live container both pass the full Python suite. If this ever diverges again, prefer the live container result when judging runtime health.
 
 ## Deployment Notes
 
