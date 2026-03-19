@@ -33,6 +33,8 @@ If a report mixes those values together, the report is wrong.
 
 Current `main` history relevant to continuation work:
 
+- `c6a30e6` `feat: rename lore skill to memory-data-engineer`
+- `c0e388b` `docs: clarify hybrid graphrag memory wording`
 - `9339e2d` `docs: align handoff commit references`
 - `4400a2f` `docs: correct brainclaw handoff and verification guidance`
 - `022138c` `fix: suppress env-backed secret warnings`
@@ -78,6 +80,15 @@ The BrainClaw TypeScript source is under `src/` and currently includes:
   - `operational_memory_sync`
 
 These are actually present in the repo. Do not claim they are missing without checking the BrainClaw repo path above.
+
+### Shipped BrainClaw skill
+
+BrainClaw currently ships one generic plugin skill under:
+
+- `skills/memory-data-engineer/SKILL.md`
+
+That skill is intentionally generic and should surface in OpenClaw as `memory-data-engineer`, not `lore`.
+Lore may use the skill, but Lore is the agent identity, not the skill name.
 
 ### Python backend
 
@@ -175,7 +186,7 @@ Command:
 
 Result on 2026-03-19:
 
-- `37` tests passed
+- `38` tests passed
 - `0` failed
 
 ### Python tests inside the live container
