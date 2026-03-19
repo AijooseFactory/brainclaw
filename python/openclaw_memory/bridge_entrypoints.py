@@ -15,6 +15,7 @@ import json
 import logging
 import uuid
 import datetime
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -465,6 +466,89 @@ def lcm_rebuild(target: str = "", **kwargs) -> dict:
 
     engine = LosslessClawSyncEngine(adapter=None, repository=repository)
     return engine.rebuild(target)
+
+
+def _detect_control_ui_status() -> str:
+    configured_url = os.getenv("BRAINCLAW_CONTROL_UI_URL")
+    urls = [configured_url] if configured_url else []
+    urls.extend(
+        [
+            "http://127.0.0.1:3000/__openclaw__/control/",
+            "http://127.0.0.1:18789/__openclaw__/control/",
+        ]
+    )
+    for url in urls:
+        try:
+            with urllib.request.urlopen(url, timeout=2) as response:
+                return "healthy" if response.status == 200 else f"http_{response.status}"
+        except Exception:
+            continue
+    return "unknown"
+
+
+def sync_operational_memory_files(
+    runtime: Optional[dict] = None,
+    plugin_config: Optional[dict] = None,
+    sync_date: Optional[str] = None,
+    **kwargs,
+) -> dict:
+    from openclaw_memory.graph.health import get_health_stats
+    from openclaw_memory.integration.lossless_adapter import (
+        LosslessClawAdapter,
+        OpenClawRuntimeSnapshot,
+    )
+    from openclaw_memory.integration.operational_memory_sync import (
+        DEFAULT_PRIMARY_AGENT_ID,
+        sync_operational_memory_files as sync_files,
+    )
+
+    plugin_config = plugin_config or {}
+    runtime_snapshot = OpenClawRuntimeSnapshot.from_dict(runtime)
+    adapter = LosslessClawAdapter(
+        runtime=runtime_snapshot,
+        db_path=plugin_config.get("losslessClawDbPath") or plugin_config.get("dbPath"),
+        plugin_config=plugin_config,
+    )
+    status = adapter.detect().to_dict()
+    graph_health = get_health_stats()
+
+    tool_names = [
+        tool_name
+        for tool_name, available in (status.get("tool_availability") or {}).items()
+        if available
+    ]
+    snapshot = {
+        "openclaw_version": runtime_snapshot.openclaw_version or status.get("openclaw_version"),
+        "memory_slot": runtime_snapshot.memory_slot,
+        "context_engine_slot": runtime_snapshot.context_engine_slot,
+        "plugin_version": status.get("plugin_version") or runtime_snapshot.plugin_version,
+        "compatibility_state": status.get("compatibility_state", "unknown"),
+        "supported_profile": status.get("supported_profile"),
+        "tool_names": tool_names,
+        "node_count": graph_health.get("node_count"),
+        "edge_count": graph_health.get("edge_count"),
+        "control_ui_status": _detect_control_ui_status(),
+    }
+
+    state_dir = Path(os.getenv("OPENCLAW_STATE_DIR", "/home/node/.openclaw"))
+    config_path = Path(os.getenv("OPENCLAW_CONFIG_PATH", state_dir / "openclaw.json"))
+
+    result = sync_files(
+        snapshot=snapshot,
+        state_dir=state_dir,
+        config_path=config_path,
+        sync_date=sync_date or datetime.date.today().isoformat(),
+        primary_agent_id=plugin_config.get("operationalMemoryPrimaryAgentId", DEFAULT_PRIMARY_AGENT_ID),
+        root_memory_path=plugin_config.get("operationalMemoryRootPath"),
+    )
+    result.update(
+        {
+            "status": "completed",
+            "compatibility_state": snapshot["compatibility_state"],
+            "control_ui_status": snapshot["control_ui_status"],
+        }
+    )
+    return result
 
 
 def _record_memory_event(cur, *, memory_item_id: uuid.UUID, event_type: str, agent_db_id: Optional[str], tenant_db_id: Optional[str], details: Optional[dict] = None) -> None:

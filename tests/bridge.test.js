@@ -216,6 +216,36 @@ test("Bridge Security: allows Lossless-Claw integration bridge entrypoints", asy
   assert.strictEqual(calls.length, 3);
 });
 
+test("Bridge Security: allows operational memory sync bridge entrypoint", async () => {
+  const calls = [];
+
+  setSpawn((_executable, args) => {
+    calls.push(args[1]);
+    return {
+      stdout: {
+        on(event, cb) {
+          if (event === "data") cb(Buffer.from(JSON.stringify({ status: "ok", target_count: 5 })));
+        },
+      },
+      stderr: { on: () => {} },
+      on(event, cb) {
+        if (event === "close") cb(0);
+      },
+      kill() {},
+    };
+  });
+
+  const result = await callPythonBackend(
+    "bridge_entrypoints",
+    "sync_operational_memory_files",
+    {},
+    baseBridgeConfig,
+  );
+
+  assert.strictEqual(result.status, "ok");
+  assert.strictEqual(calls.length, 1);
+});
+
 test("LCM Runtime: falls back when runtime version is unavailable or unknown", () => {
   const runtime = buildLosslessClawRuntimeSnapshot({
     config: {

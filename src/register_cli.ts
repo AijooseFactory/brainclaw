@@ -9,6 +9,7 @@ export function registerBrainclawCli(api: any) {
   api.registerCli?.(({ program, config, logger }: any) => {
     const brainclaw = program.command("brainclaw").description("BrainClaw operational commands");
     const lcm = brainclaw.command("lcm").description("Lossless-Claw integration commands");
+    const memory = brainclaw.command("memory").description("BrainClaw operational memory commands");
 
     lcm.command("status").action(async () => {
       const pluginConfig = resolveBrainclawPluginConfig(config);
@@ -59,6 +60,22 @@ export function registerBrainclawCli(api: any) {
         printJson(result);
       });
 
-    logger.info?.("[brainclaw] registered CLI commands: brainclaw lcm status|sync, brainclaw rebuild");
+    memory.command("sync").action(async () => {
+      const pluginConfig = resolveBrainclawPluginConfig(config);
+      const runtime = buildLosslessClawRuntimeSnapshot({
+        config,
+        pluginConfig,
+        runtimeVersion: api.runtime?.version,
+      });
+      const result = await callPythonBackend(
+        "bridge_entrypoints",
+        "sync_operational_memory_files",
+        { runtime, plugin_config: pluginConfig },
+        pluginConfig,
+      );
+      printJson(result);
+    });
+
+    logger.info?.("[brainclaw] registered CLI commands: brainclaw lcm status|sync, brainclaw rebuild, brainclaw memory sync");
   }, { commands: ["brainclaw"] });
 }

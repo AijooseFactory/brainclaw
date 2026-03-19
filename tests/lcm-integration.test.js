@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import brainclawPlugin from "../dist/index.js";
+import { registerBrainclawCli } from "../dist/register_cli.js";
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
@@ -14,6 +15,10 @@ test("BrainClaw manifest exposes Lossless-Claw integration configuration", () =>
   const properties = manifest.configSchema?.properties ?? {};
 
   for (const key of [
+    "operationalMemorySyncEnabled",
+    "operationalMemorySyncIntervalMs",
+    "operationalMemoryPrimaryAgentId",
+    "operationalMemoryRootPath",
     "losslessClawEnabled",
     "losslessClawPluginPath",
     "losslessClawDbPath",
@@ -74,4 +79,53 @@ test("BrainClaw registers Lossless-Claw integration service and CLI surfaces", (
     registeredCli.some(({ options }) => options?.commands?.includes("brainclaw")),
     "Expected BrainClaw to register the brainclaw CLI surface",
   );
+});
+
+test("BrainClaw CLI exposes a memory sync command", () => {
+  let registrar;
+
+  function createCommand(name) {
+    return {
+      name,
+      children: [],
+      description() {
+        return this;
+      },
+      command(childName) {
+        const child = createCommand(childName);
+        this.children.push(child);
+        return child;
+      },
+      requiredOption() {
+        return this;
+      },
+      action(handler) {
+        this.handler = handler;
+        return this;
+      },
+    };
+  }
+
+  registerBrainclawCli({
+    registerCli(fn) {
+      registrar = fn;
+    },
+  });
+
+  const program = createCommand("root");
+  registrar({
+    program,
+    config: { plugins: { entries: { brainclaw: { config: {} } } } },
+    logger: { info() {} },
+  });
+
+  const brainclaw = program.children.find((entry) => entry.name === "brainclaw");
+  assert.ok(brainclaw, "Expected root brainclaw command");
+
+  const memory = brainclaw.children.find((entry) => entry.name === "memory");
+  assert.ok(memory, "Expected brainclaw memory command");
+
+  const sync = memory.children.find((entry) => entry.name === "sync");
+  assert.ok(sync, "Expected brainclaw memory sync command");
+  assert.strictEqual(typeof sync.handler, "function");
 });
