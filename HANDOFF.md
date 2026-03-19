@@ -22,7 +22,7 @@ Do not use older notes that refer to `codex/lossless-claw-integration`. That bra
 
 ## What BrainClaw Includes
 
-BrainClaw is broader than the Lossless-Claw work. The current `main` branch contains a full Hybrid GraphRAG memory plugin with these major subsystems.
+BrainClaw's current `main` branch contains a full Hybrid GraphRAG memory plugin with these major subsystems.
 
 ### TypeScript OpenClaw plugin layer
 
@@ -120,7 +120,7 @@ Primary integration files:
 - `python/openclaw_memory/integration/sync_error_handling.py`
 - `python/openclaw_memory/integration/operations.py`
 
-### Lossless-Claw is one major feature, not the whole project
+### Lossless-Claw (one of many features)
 
 Lossless-Claw-related work on `main` specifically includes:
 
