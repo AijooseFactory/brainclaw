@@ -4,7 +4,16 @@ Keep package import light so helper submodules can be used without pulling
 optional runtime dependencies like asyncpg during unit tests.
 """
 
-__all__ = ["OpenClawMemoryClient", "SessionMemoryContext", "LCMMigrationHandler"]
+__all__ = [
+    "OpenClawMemoryClient",
+    "SessionMemoryContext",
+    "LCMMigrationHandler",
+    "LosslessClawAdapter",
+    "CompatibilityState",
+    "ReasonCode",
+    "PromotionThresholds",
+    "OpenClawRuntimeSnapshot",
+]
 
 
 def __getattr__(name: str):
@@ -20,4 +29,26 @@ def __getattr__(name: str):
         from .lcm_migration import LCMMigrationHandler
 
         return LCMMigrationHandler
+    if name in {
+        "LosslessClawAdapter",
+        "CompatibilityState",
+        "ReasonCode",
+        "PromotionThresholds",
+        "OpenClawRuntimeSnapshot",
+    }:
+        from .lossless_adapter import (
+            LosslessClawAdapter,
+            CompatibilityState,
+            ReasonCode,
+            PromotionThresholds,
+            OpenClawRuntimeSnapshot,
+        )
+
+        return {
+            "LosslessClawAdapter": LosslessClawAdapter,
+            "CompatibilityState": CompatibilityState,
+            "ReasonCode": ReasonCode,
+            "PromotionThresholds": PromotionThresholds,
+            "OpenClawRuntimeSnapshot": OpenClawRuntimeSnapshot,
+        }[name]
     raise AttributeError(name)

@@ -22,7 +22,27 @@
       "pythonTimeoutMs": { "type": "integer", "default": 30000, "description": "Timeout for Python backend calls in milliseconds." },
       "pythonPath": { "type": "string", "default": "python3", "description": "Path to Python executable. Defaults to system python3. Use ${OPENCLAW_PYTHON} for env var." },
       "pythonBackendPath": { "type": "string", "description": "Path to openclaw-memory Python package. Required for plugin operation. Use ${OPENCLAW_PYTHON_BACKEND} for env var." },
-      "brainclawSecret": { "type": "string", "sensitive": true, "description": "Shared secret for HMAC-signed identity tokens. Use ${BRAINCLAW_SECRET} for secrets." }
+      "brainclawSecret": { "type": "string", "sensitive": true, "description": "Shared secret for HMAC-signed identity tokens. Use ${BRAINCLAW_SECRET} for secrets." },
+      "losslessClawEnabled": { "type": "boolean", "default": true, "description": "Enable BrainClaw detection and integration with Lossless-Claw when installed." },
+      "losslessClawPluginPath": { "type": "string", "description": "Optional explicit install path for the Lossless-Claw plugin." },
+      "losslessClawDbPath": { "type": "string", "description": "Optional explicit path to the Lossless-Claw SQLite database." },
+      "losslessClawBootstrapOnStart": { "type": "boolean", "default": true, "description": "Run bootstrap discovery/import on service startup when the runtime gate passes." },
+      "losslessClawPollIntervalMs": { "type": "integer", "minimum": 1000, "default": 60000, "description": "Polling interval for incremental Lossless-Claw sync." },
+      "losslessClawDrillDownEnabled": { "type": "boolean", "default": true, "description": "Allow BrainClaw to request Lossless-Claw drill-down evidence when canonical memory indicates LCM provenance." },
+      "losslessClawArtifactQuotaBytes": { "type": "integer", "minimum": 1048576, "default": 268435456, "description": "Maximum BrainClaw storage budget for imported Lossless-Claw source artifacts." },
+      "losslessClawAnchorByteCap": { "type": "integer", "minimum": 1024, "default": 262144, "description": "Maximum raw anchor bytes to ingest or expand for a single Lossless-Claw artifact." },
+      "losslessClawLargeFileMode": {
+        "type": "string",
+        "enum": ["references_only", "summary_and_references", "authorized_expand_only"],
+        "default": "references_only",
+        "description": "How BrainClaw handles Lossless-Claw large-file references."
+      },
+      "losslessClawTrustMode": {
+        "type": "string",
+        "enum": ["local_readonly", "disabled"],
+        "default": "local_readonly",
+        "description": "Trust posture for Lossless-Claw integration. local_readonly is filesystem read-only, not cryptographic attestation."
+      }
     },
     "description": "All fields are optional at install time. Configure via Control UI after install, or use ${ENV_VAR} substitution."
 

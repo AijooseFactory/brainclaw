@@ -387,6 +387,86 @@ def summarize_audit_health(
     }
 
 
+def lcm_status(runtime: Optional[dict] = None, plugin_config: Optional[dict] = None, **kwargs) -> dict:
+    from openclaw_memory.integration.lossless_adapter import (
+        LosslessClawAdapter,
+        OpenClawRuntimeSnapshot,
+    )
+    from openclaw_memory.integration.lossless_sync import build_postgres_repository_from_env
+
+    adapter = LosslessClawAdapter(
+        runtime=OpenClawRuntimeSnapshot.from_dict(runtime),
+        db_path=(plugin_config or {}).get("losslessClawDbPath") or (plugin_config or {}).get("dbPath"),
+        plugin_config=plugin_config or {},
+    )
+    report = adapter.detect().to_dict()
+    repository = build_postgres_repository_from_env()
+    if repository is not None:
+        repository.upsert_integration_state(report)
+    return report
+
+
+def lcm_sync(
+    runtime: Optional[dict] = None,
+    plugin_config: Optional[dict] = None,
+    mode: str = "incremental",
+    **kwargs,
+) -> dict:
+    from openclaw_memory.integration.lossless_adapter import (
+        LosslessClawAdapter,
+        OpenClawRuntimeSnapshot,
+    )
+    from openclaw_memory.integration.lossless_sync import (
+        LosslessClawSyncEngine,
+        build_postgres_repository_from_env,
+    )
+
+    adapter = LosslessClawAdapter(
+        runtime=OpenClawRuntimeSnapshot.from_dict(runtime),
+        db_path=(plugin_config or {}).get("losslessClawDbPath") or (plugin_config or {}).get("dbPath"),
+        plugin_config=plugin_config or {},
+    )
+    status = adapter.detect().to_dict()
+    repository = build_postgres_repository_from_env()
+
+    if repository is None:
+        if status["compatibility_state"] != "installed_compatible":
+            return {
+                "status": "skipped",
+                "mode": mode,
+                "compatibility_state": status["compatibility_state"],
+                "reason_code": status.get("reason_code"),
+            }
+        return {
+            "status": "failed",
+            "mode": mode,
+            "compatibility_state": status["compatibility_state"],
+            "reason_code": status.get("reason_code"),
+            "error": "Canonical PostgreSQL repository unavailable",
+        }
+
+    engine = LosslessClawSyncEngine(adapter=adapter, repository=repository)
+    return engine.sync(mode=mode)
+
+
+def lcm_rebuild(target: str = "", **kwargs) -> dict:
+    from openclaw_memory.integration.lossless_sync import (
+        LosslessClawSyncEngine,
+        build_postgres_repository_from_env,
+    )
+
+    repository = build_postgres_repository_from_env()
+    if repository is None:
+        return {
+            "status": "failed",
+            "target": str(target or "").strip().lower(),
+            "error": "Canonical PostgreSQL repository unavailable",
+        }
+
+    engine = LosslessClawSyncEngine(adapter=None, repository=repository)
+    return engine.rebuild(target)
+
+
 def _record_memory_event(cur, *, memory_item_id: uuid.UUID, event_type: str, agent_db_id: Optional[str], tenant_db_id: Optional[str], details: Optional[dict] = None) -> None:
     from psycopg2.extras import Json
 

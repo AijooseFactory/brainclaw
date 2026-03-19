@@ -8,6 +8,8 @@ export const BRAINCLAW_FEATURES = [
   "ingest",
   "graph-health",
   "contradiction",
+  "lossless-claw-integration",
+  "brainclaw-cli",
   "prompt-recall",
   "agent-end-capture",
   "memory-bootstrap-filter",
