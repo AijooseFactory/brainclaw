@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-19  
 > Branch: `main`  
-> Head: `957d812`  
+> Verified baseline before this handoff refresh: `957d812`  
 > Live OpenClaw mount: `./brainclaw-sync -> /home/node/.openclaw/extensions/brainclaw`
 
 ## Current Truth
@@ -20,31 +20,135 @@ Important recent commits on `main`:
 
 Do not use older notes that refer to `codex/lossless-claw-integration`. That branch is obsolete for current continuation work.
 
-## What Is Implemented
+## What BrainClaw Includes
 
-BrainClaw on `main` includes:
+BrainClaw is broader than the Lossless-Claw work. The current `main` branch contains a full Hybrid GraphRAG memory plugin with these major subsystems.
 
-- OpenClaw runtime gating for Lossless-Claw integration
-- compatibility-state persistence and schema fingerprint handling
-- canonical LCM import into `source_artifacts`
-- staged candidate extraction and promotion pipeline
-- CLI surfaces for `brainclaw lcm status`, `sync`, `rebuild`, and `brainclaw memory sync`
-- operational memory sync features
-- PRD-aligned plugin manifest and canonical data-model documentation
+### TypeScript OpenClaw plugin layer
 
-Primary implementation files:
+Registered in `src/index.ts`:
+
+- agent tools:
+  - `search`
+  - `memory_search`
+  - `memory_get`
+  - `ingest`
+  - `graph_health`
+  - `contradiction_check`
+- hooks:
+  - prompt recall
+  - bootstrap filtering for `MEMORY.md`
+  - agent-end capture
+- background services:
+  - summarizer
+  - audit logger
+  - entity extractor
+  - contradiction detector
+  - Lossless-Claw integration service
+  - operational memory sync service
+- BrainClaw CLI registration
+
+Primary TypeScript files:
+
+- `src/index.ts`
+- `src/bridge.ts`
+- `src/register_cli.ts`
+- `src/lcm_runtime.ts`
+- `src/tools/*`
+- `src/hooks/*`
+- `src/services/*`
+- `src/validation.ts`
+
+### Python backend
+
+The Python backend under `python/openclaw_memory` contains:
+
+- storage clients:
+  - PostgreSQL
+  - Neo4j
+  - Weaviate
+- ingest and pipeline code:
+  - ingestion
+  - chunking
+  - extraction
+  - redaction
+  - pipeline sync
+- retrieval code:
+  - fusion
+  - RRF fusion
+  - intent routing
+  - drill-down
+  - retrieval policy
+- graph code:
+  - graph health
+  - communities
+  - summarization
+- memory domain code:
+  - memory classes
+  - lifecycle
+  - write policy
+- audit and observability:
+  - audit log
+  - metrics
+  - telemetry
+  - logging
+- security helpers:
+  - access control
+  - team lookup
+
+### BrainClaw integration and operational features
+
+The integration and operations layer includes:
+
+- source adapter protocol
+- artifact validation
+- Lossless-Claw detection and sync
+- operational memory sync
+- promotion overrides
+- retry and sync error handling
+- migration and operations helpers
+- memory backup/session context helpers
+
+Primary integration files:
+
+- `python/openclaw_memory/integration/source_adapter.py`
+- `python/openclaw_memory/integration/artifact_validation.py`
+- `python/openclaw_memory/integration/lossless_adapter.py`
+- `python/openclaw_memory/integration/lossless_sync.py`
+- `python/openclaw_memory/integration/operational_memory_sync.py`
+- `python/openclaw_memory/integration/promotion_override.py`
+- `python/openclaw_memory/integration/sync_error_handling.py`
+- `python/openclaw_memory/integration/operations.py`
+
+### Lossless-Claw is one major feature, not the whole project
+
+Lossless-Claw-related work on `main` specifically includes:
+
+- OpenClaw runtime gating
+- compatibility-state persistence
+- schema fingerprint handling
+- canonical import into `source_artifacts`
+- staged candidate extraction and promotion flow
+- drill-down routing and CLI status/sync/rebuild surfaces
+
+Important implementation files for that feature:
 
 - `src/lcm_runtime.ts`
 - `src/register_cli.ts`
 - `python/openclaw_memory/bridge_entrypoints.py`
 - `python/openclaw_memory/integration/lossless_adapter.py`
 - `python/openclaw_memory/integration/lossless_sync.py`
-- `python/openclaw_memory/integration/source_adapter.py`
-- `python/openclaw_memory/integration/artifact_validation.py`
-- `python/openclaw_memory/integration/operational_memory_sync.py`
 - `python/openclaw_memory/retrieval/drill_down.py`
 - `python/openclaw_memory/retrieval/intent.py`
 - `python/openclaw_memory/observability/lcm_metrics.py`
+
+### Canonical documentation
+
+Project-level contract and plugin surfaces live in:
+
+- `README.md`
+- `openclaw.plugin.json`
+- `specs/001-authoritative-memory-backend/data-model.md`
 
 ## Live Runtime Verification
 
