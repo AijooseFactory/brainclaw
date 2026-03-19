@@ -1,8 +1,9 @@
 ---
-description: Generic knowledge and lore skill for any OpenClaw agent. Provides context-aware memory retrieval and consistency checking.
+name: memory-data-engineer
+description: Generic memory data engineering skill for any OpenClaw agent. Provides context-aware memory retrieval and consistency checking.
 ---
 
-# OpenClaw Lore Skill
+# Memory Data Engineer
 
 This skill allows an agent to access and contribute to a shared, high-fidelity knowledge base (BrainClaw). It provides long-term memory, entity-relationship tracking, and contradiction detection.
 
