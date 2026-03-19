@@ -14,7 +14,7 @@
       "extractionModel": { "type": "string" },
       "enableAuditLedger": { "type": "boolean", "default": true },
       "enableCommunityDetection": { "type": "boolean", "default": true },
-      "enablePromptRecall": { "type": "boolean", "default": true, "description": "Inject BrainClaw recall into the prompt so it becomes the primary durable memory source." },
+      "enablePromptRecall": { "type": "boolean", "default": true, "description": "Inject BrainClaw recall into the prompt so it becomes the primary Hybrid GraphRAG memory source." },
       "promptRecallTopK": { "type": "integer", "minimum": 1, "default": 4, "description": "How many BrainClaw memories to inject into prompt-time recall." },
       "suppressMemoryBootstrap": { "type": "boolean", "default": true, "description": "Remove MEMORY.md from bootstrap prompt context while BrainClaw is the active memory slot." },
       "captureAgentEnd": { "type": "boolean", "default": true, "description": "Capture durable assistant decisions/procedures at agent end using MEMORY.md-first backup then BrainClaw upsert." },

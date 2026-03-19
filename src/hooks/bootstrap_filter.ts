@@ -46,7 +46,7 @@ export function registerBootstrapFilterHook(api: any) {
     {
       name: "brainclaw.agent-bootstrap-filter",
       description:
-        "Removes MEMORY.md bootstrap injection when BrainClaw is the active durable memory plugin.",
+        "Removes MEMORY.md bootstrap injection when BrainClaw is the active Hybrid GraphRAG memory plugin.",
     },
   );
 }

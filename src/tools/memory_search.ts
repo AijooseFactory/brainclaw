@@ -19,7 +19,7 @@ function normalizeSearchResults(results: any[]) {
 export const memorySearchTool = {
   name: "memory_search",
   description:
-    "Search BrainClaw durable memory using hybrid GraphRAG retrieval and return portable citations.",
+    "Search BrainClaw Hybrid GraphRAG memory using hybrid retrieval and return portable citations.",
   parameters: Type.Object({
     query: Type.String({ description: "The memory search query" }),
     maxResults: Type.Optional(

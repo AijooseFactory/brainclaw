@@ -103,7 +103,7 @@ test("BrainClaw registers the standard OpenClaw memory tools", () => {
   );
 });
 
-test("BrainClaw prompt recall injects authoritative durable memory context", async () => {
+test("BrainClaw prompt recall injects authoritative Hybrid GraphRAG memory context", async () => {
   const events = [];
   const runtimeHooks = [];
 
@@ -154,7 +154,7 @@ test("BrainClaw prompt recall injects authoritative durable memory context", asy
   );
 
   assert.ok(
-    result.prependSystemContext.includes("BrainClaw is the authoritative durable memory source"),
+    result.prependSystemContext.includes("BrainClaw is the authoritative Hybrid GraphRAG memory source"),
     "Expected stable system guidance to prefer BrainClaw over MEMORY.md"
   );
   assert.ok(
@@ -310,7 +310,7 @@ test("BrainClaw agent_end capture ingests durable assistant decisions", async ()
 
   assert.ok(
     bridgeCalls.some((script) => script.includes("from openclaw_memory.bridge_entrypoints import ingest_event")),
-    "Expected agent_end capture to persist durable memory through ingest_event"
+    "Expected agent_end capture to persist Hybrid GraphRAG memory through ingest_event"
   );
 });
 
