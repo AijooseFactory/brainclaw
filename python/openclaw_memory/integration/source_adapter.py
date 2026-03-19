@@ -278,5 +278,3 @@ class SourceAdapterRegistry:
     def detect_all(self) -> Dict[str, DetectionReport]:
         """Run detection on all registered adapters."""
         return {name: adapter.detect() for name, adapter in self._adapters.items()}
-""",
-<parameter name="CodeMarkdownLanguage">python
