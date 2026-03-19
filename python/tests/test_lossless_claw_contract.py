@@ -92,6 +92,31 @@ def test_lossless_adapter_contract_exposes_required_states_thresholds_and_reason
     }
 
 
+def test_lossless_adapter_defaults_to_openclaw_state_dir_for_lcm_db(tmp_path, monkeypatch):
+    from openclaw_memory.integration.lossless_adapter import (
+        LosslessClawAdapter,
+        OpenClawRuntimeSnapshot,
+    )
+
+    monkeypatch.setenv("OPENCLAW_STATE_DIR", str(tmp_path))
+
+    adapter = LosslessClawAdapter(
+        runtime=OpenClawRuntimeSnapshot(
+            openclaw_version="2026.3.14",
+            memory_slot="brainclaw",
+            context_engine_slot="lossless-claw",
+            plugin_enabled=True,
+            plugin_installed=True,
+            plugin_version="0.4.0",
+            plugin_install_path=str(tmp_path),
+            tool_names=[],
+        ),
+        plugin_config={},
+    )
+
+    assert adapter.resolve_db_path() == str(tmp_path / "lcm.db")
+
+
 def test_lossless_adapter_detects_supported_schema_and_session_policy(tmp_path):
     from openclaw_memory.integration.lossless_adapter import (
         CompatibilityState,
@@ -168,7 +193,7 @@ def test_lossless_adapter_detects_supported_schema_and_session_policy(tmp_path):
 
     adapter = LosslessClawAdapter(
         runtime=OpenClawRuntimeSnapshot(
-            openclaw_version="2026.3.13",
+            openclaw_version="2026.3.14",
             memory_slot="brainclaw",
             context_engine_slot="lossless-claw",
             plugin_enabled=True,
@@ -194,3 +219,190 @@ def test_lossless_adapter_detects_supported_schema_and_session_policy(tmp_path):
     assert adapter.classify_session_statefulness("tmp-session-1").import_allowed is False
     assert adapter.classify_session_statefulness("stateless-session-1").promotable is False
 
+
+def test_lossless_adapter_accepts_validated_openclaw_2026_3_14_runtime(tmp_path):
+    from openclaw_memory.integration.lossless_adapter import (
+        CompatibilityState,
+        LosslessClawAdapter,
+        OpenClawRuntimeSnapshot,
+    )
+
+    db_path = tmp_path / "lcm.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE conversations (
+              conversation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+              session_id TEXT NOT NULL
+            );
+            CREATE TABLE messages (
+              message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+              conversation_id INTEGER NOT NULL,
+              seq INTEGER NOT NULL,
+              role TEXT NOT NULL,
+              content TEXT NOT NULL,
+              token_count INTEGER NOT NULL,
+              created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE summaries (
+              summary_id TEXT PRIMARY KEY,
+              conversation_id INTEGER NOT NULL,
+              kind TEXT NOT NULL,
+              depth INTEGER NOT NULL DEFAULT 0,
+              content TEXT NOT NULL,
+              token_count INTEGER NOT NULL,
+              earliest_at TEXT,
+              latest_at TEXT,
+              descendant_count INTEGER NOT NULL DEFAULT 0,
+              created_at TEXT NOT NULL DEFAULT (datetime('now')),
+              file_ids TEXT NOT NULL DEFAULT '[]'
+            );
+            CREATE TABLE message_parts (
+              part_id TEXT PRIMARY KEY,
+              message_id INTEGER NOT NULL,
+              session_id TEXT NOT NULL,
+              part_type TEXT NOT NULL,
+              ordinal INTEGER NOT NULL
+            );
+            CREATE TABLE summary_messages (
+              summary_id TEXT NOT NULL,
+              message_id INTEGER NOT NULL,
+              ordinal INTEGER NOT NULL
+            );
+            CREATE TABLE summary_parents (
+              summary_id TEXT NOT NULL,
+              parent_summary_id TEXT NOT NULL,
+              ordinal INTEGER NOT NULL
+            );
+            CREATE TABLE context_items (
+              conversation_id INTEGER NOT NULL,
+              ordinal INTEGER NOT NULL,
+              item_type TEXT NOT NULL,
+              message_id INTEGER,
+              summary_id TEXT
+            );
+            CREATE TABLE large_files (
+              file_id TEXT PRIMARY KEY,
+              conversation_id INTEGER NOT NULL,
+              storage_uri TEXT NOT NULL,
+              exploration_summary TEXT
+            );
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    adapter = LosslessClawAdapter(
+        runtime=OpenClawRuntimeSnapshot(
+            openclaw_version="2026.3.14",
+            memory_slot="brainclaw",
+            context_engine_slot="lossless-claw",
+            plugin_enabled=True,
+            plugin_installed=True,
+            plugin_version="0.4.0",
+            plugin_install_path=str(tmp_path),
+            tool_names=["lcm_grep", "lcm_describe", "lcm_expand_query"],
+        ),
+        db_path=str(db_path),
+        plugin_config={"dbPath": str(db_path)},
+    )
+
+    report = adapter.detect()
+
+    assert report.compatibility_state is CompatibilityState.INSTALLED_COMPATIBLE
+
+
+def test_lossless_adapter_accepts_openclaw_versions_after_2026_3_14_floor(tmp_path):
+    from openclaw_memory.integration.lossless_adapter import (
+        CompatibilityState,
+        LosslessClawAdapter,
+        OpenClawRuntimeSnapshot,
+    )
+
+    db_path = tmp_path / "lcm.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE conversations (
+              conversation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+              session_id TEXT NOT NULL
+            );
+            CREATE TABLE messages (
+              message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+              conversation_id INTEGER NOT NULL,
+              seq INTEGER NOT NULL,
+              role TEXT NOT NULL,
+              content TEXT NOT NULL,
+              token_count INTEGER NOT NULL,
+              created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE summaries (
+              summary_id TEXT PRIMARY KEY,
+              conversation_id INTEGER NOT NULL,
+              kind TEXT NOT NULL,
+              depth INTEGER NOT NULL DEFAULT 0,
+              content TEXT NOT NULL,
+              token_count INTEGER NOT NULL,
+              earliest_at TEXT,
+              latest_at TEXT,
+              descendant_count INTEGER NOT NULL DEFAULT 0,
+              created_at TEXT NOT NULL DEFAULT (datetime('now')),
+              file_ids TEXT NOT NULL DEFAULT '[]'
+            );
+            CREATE TABLE message_parts (
+              part_id TEXT PRIMARY KEY,
+              message_id INTEGER NOT NULL,
+              session_id TEXT NOT NULL,
+              part_type TEXT NOT NULL,
+              ordinal INTEGER NOT NULL
+            );
+            CREATE TABLE summary_messages (
+              summary_id TEXT NOT NULL,
+              message_id INTEGER NOT NULL,
+              ordinal INTEGER NOT NULL
+            );
+            CREATE TABLE summary_parents (
+              summary_id TEXT NOT NULL,
+              parent_summary_id TEXT NOT NULL,
+              ordinal INTEGER NOT NULL
+            );
+            CREATE TABLE context_items (
+              conversation_id INTEGER NOT NULL,
+              ordinal INTEGER NOT NULL,
+              item_type TEXT NOT NULL,
+              message_id INTEGER,
+              summary_id TEXT
+            );
+            CREATE TABLE large_files (
+              file_id TEXT PRIMARY KEY,
+              conversation_id INTEGER NOT NULL,
+              storage_uri TEXT NOT NULL,
+              exploration_summary TEXT
+            );
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    adapter = LosslessClawAdapter(
+        runtime=OpenClawRuntimeSnapshot(
+            openclaw_version="2026.3.15",
+            memory_slot="brainclaw",
+            context_engine_slot="lossless-claw",
+            plugin_enabled=True,
+            plugin_installed=True,
+            plugin_version="0.4.0",
+            plugin_install_path=str(tmp_path),
+            tool_names=["lcm_grep", "lcm_describe", "lcm_expand_query"],
+        ),
+        db_path=str(db_path),
+        plugin_config={"dbPath": str(db_path)},
+    )
+
+    report = adapter.detect()
+
+    assert report.compatibility_state is CompatibilityState.INSTALLED_COMPATIBLE

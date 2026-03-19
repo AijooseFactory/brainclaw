@@ -100,7 +100,7 @@ PROJECT_PATTERN = re.compile(
 # System names (specific technologies)
 SYSTEM_PATTERN = re.compile(
     r'\b(PostgreSQL|Neo4j|Weaviate|Redis|MongoDB|Elasticsearch|Kafka|Docker|Kubernetes)'
-    r'|OpenClaw|ChatGPT|Claude|GPT-\d|BERT|Transformer'
+    r'|OpenClaw|BrainClaw|Lossless-Claw|ChatGPT|Claude|GPT-\d|BERT|Transformer'
     r'(?:DB|Store|Server|API)?\b',
     re.IGNORECASE
 )
@@ -322,10 +322,32 @@ def extract_relationships(text: str, entities: Optional[List[Entity]] = None) ->
         List of Relationship objects
     """
     relationships = []
-    
+    seen_relationships: Set[tuple[str, str, str]] = set()
+
     if not text or not entities or len(entities) < 2:
         return relationships
-    
+
+    def append_relationship(source_name: str, target_name: str, relationship_type: str, confidence: float, evidence: str) -> None:
+        for source_entity in entities:
+            if source_name.lower() not in source_entity.name.lower():
+                continue
+            for target_entity in entities:
+                if source_entity.id == target_entity.id:
+                    continue
+                if target_name.lower() not in target_entity.name.lower():
+                    continue
+                key = (source_entity.id, target_entity.id, relationship_type)
+                if key in seen_relationships:
+                    continue
+                seen_relationships.add(key)
+                relationships.append(Relationship(
+                    source_entity_id=source_entity.id,
+                    target_entity_id=target_entity.id,
+                    relationship_type=relationship_type,
+                    confidence=confidence,
+                    evidence=evidence,
+                ))
+
     # Simple rule-based relationship detection
     
     # works_on pattern: "X works on Y"
@@ -335,21 +357,13 @@ def extract_relationships(text: str, entities: Optional[List[Entity]] = None) ->
     )
     
     for match in works_on_pattern.finditer(text):
-        source_name = match.group(1).strip()
-        target_name = match.group(2).strip()
-        
-        # Find matching entities
-        for e in entities:
-            if source_name.lower() in e.name.lower():
-                for t in entities:
-                    if target_name.lower() in t.name.lower():
-                        relationships.append(Relationship(
-                            source_entity_id=e.id,
-                            target_entity_id=t.id,
-                            relationship_type="works_on",
-                            confidence=0.7,
-                            evidence=match.group(0),
-                        ))
+        append_relationship(
+            match.group(1).strip(),
+            match.group(2).strip(),
+            "works_on",
+            0.7,
+            match.group(0),
+        )
     
     # depends_on pattern
     depends_pattern = re.compile(
@@ -358,21 +372,71 @@ def extract_relationships(text: str, entities: Optional[List[Entity]] = None) ->
     )
     
     for match in depends_pattern.finditer(text):
-        source_name = match.group(1).strip()
-        target_name = match.group(2).strip()
-        
-        for e in entities:
-            if source_name.lower() in e.name.lower():
-                for t in entities:
-                    if target_name.lower() in t.name.lower():
-                        relationships.append(Relationship(
-                            source_entity_id=e.id,
-                            target_entity_id=t.id,
-                            relationship_type="depends_on",
-                            confidence=0.8,
-                            evidence=match.group(0),
-                        ))
-    
+        append_relationship(
+            match.group(1).strip(),
+            match.group(2).strip(),
+            "depends_on",
+            0.8,
+            match.group(0),
+        )
+
+    uses_pattern = re.compile(
+        r'([A-Za-z][A-Za-z0-9_-]*(?:\s+[A-Za-z][A-Za-z0-9_-]*)?)\s+(?:uses?|using)\s+([A-Za-z][A-Za-z0-9_-]*(?:\s+[A-Za-z][A-Za-z0-9_-]*)?)',
+        re.IGNORECASE,
+    )
+    for match in uses_pattern.finditer(text):
+        append_relationship(
+            match.group(1).strip(),
+            match.group(2).strip(),
+            "uses",
+            0.82,
+            match.group(0),
+        )
+
+    integrates_pattern = re.compile(
+        r'([A-Za-z][A-Za-z0-9_-]*(?:\s+[A-Za-z][A-Za-z0-9_-]*)?)\s+(?:integrates?\s+with|works?\s+with|paired\s+with)\s+([A-Za-z][A-Za-z0-9_-]*(?:\s+[A-Za-z][A-Za-z0-9_-]*)?)',
+        re.IGNORECASE,
+    )
+    for match in integrates_pattern.finditer(text):
+        append_relationship(
+            match.group(1).strip(),
+            match.group(2).strip(),
+            "collaborates_with",
+            0.76,
+            match.group(0),
+        )
+
+    for sentence in re.split(r'(?<=[.!?])\s+', text):
+        lowered = sentence.lower()
+        mentions = []
+        for entity in entities:
+            idx = lowered.find(entity.name.lower())
+            if idx >= 0:
+                mentions.append((idx, entity.name))
+        mentions.sort(key=lambda item: item[0])
+        ordered_names = []
+        for _, name in mentions:
+            if name not in ordered_names:
+                ordered_names.append(name)
+        if len(ordered_names) < 2:
+            continue
+        if re.search(r'\buses?\b|\busing\b', lowered):
+            append_relationship(
+                ordered_names[0],
+                ordered_names[1],
+                "uses",
+                0.82,
+                sentence.strip(),
+            )
+        elif re.search(r'\b(integrates?\s+with|works?\s+with|paired\s+with)\b', lowered):
+            append_relationship(
+                ordered_names[0],
+                ordered_names[1],
+                "collaborates_with",
+                0.76,
+                sentence.strip(),
+            )
+
     return relationships
 
 

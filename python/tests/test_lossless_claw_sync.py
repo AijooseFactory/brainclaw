@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
+import types
 from pathlib import Path
 
 
@@ -168,7 +170,7 @@ def _build_engine(tmp_path: Path):
 
     adapter = LosslessClawAdapter(
         runtime=OpenClawRuntimeSnapshot(
-            openclaw_version="2026.3.13",
+            openclaw_version="2026.3.14",
             memory_slot="brainclaw",
             context_engine_slot="lossless-claw",
             plugin_enabled=True,
@@ -232,6 +234,49 @@ def test_sync_engine_replay_is_deterministic_and_does_not_duplicate_promotions(t
     assert len(repo.memory_items) == first["promoted_count"]
 
 
+def test_repair_mode_reprocesses_existing_artifacts_without_duplicate_source_rows(tmp_path):
+    engine, repo = _build_engine(tmp_path)
+
+    first = engine.sync(mode="bootstrap")
+
+    def patched_extract(summary, source_artifact_ref):
+        if summary["source_artifact_id"] != "sum-stateful":
+            return []
+        return [
+            {
+                "source_artifact_id": source_artifact_ref,
+                "candidate_type": "ProcedureCandidate",
+                "memory_class_target": "procedural",
+                "memory_type_target": "procedure",
+                "content": "Procedure: restart ajf-openclaw and verify logs",
+                "structured_payload": {"kind": summary["kind"], "label": "procedure"},
+                "raw_extraction_confidence": 0.9,
+                "interpretive_confidence": 0.0,
+                "topic_hint_match_score": 0.8,
+                "interpretation_flag": "EXTRACTIVE",
+                "extractor_version": "lossless-sync-v2",
+                "derivation_path": ["lcm_summary", "procedure"],
+                "topic_hints": list(summary["topic_hints"]),
+                "original_message_ids": list(summary["original_message_ids"]),
+                "source_session_id": summary["source_session_id"],
+            }
+        ]
+
+    engine._extract_candidates = patched_extract  # type: ignore[method-assign]
+
+    second = engine.sync(mode="repair")
+
+    assert first["source_artifact_count"] == len(repo.source_artifacts)
+    assert second["source_artifact_count"] == 0
+    assert second["duplicate_artifact_count"] == len(repo.source_artifacts)
+    assert second["promoted_count"] == 1
+    assert any(
+        candidate["candidate_type"] == "ProcedureCandidate"
+        and candidate["extractor_version"] == "lossless-sync-v2"
+        for candidate in repo.memory_candidates.values()
+    )
+
+
 def test_sync_engine_blocks_contradicted_candidates_without_graph_edges(tmp_path):
     from openclaw_memory.integration.lossless_adapter import ReasonCode
 
@@ -259,16 +304,312 @@ def test_sync_engine_blocks_contradicted_candidates_without_graph_edges(tmp_path
     )
 
 
-def test_rebuild_marks_backfill_targets_from_canonical_records(tmp_path):
+def test_build_postgres_repository_from_env_constructs_repository_when_driver_is_installed(monkeypatch):
+    from openclaw_memory.integration.lossless_sync import (
+        PostgresLosslessRepository,
+        build_postgres_repository_from_env,
+    )
+
+    fake_psycopg2 = types.ModuleType("psycopg2")
+    fake_psycopg2.__path__ = []  # Mark as package so submodule imports work.
+    fake_extras = types.ModuleType("psycopg2.extras")
+
+    class _Json:
+        def __init__(self, value):
+            self.value = value
+
+    fake_extras.Json = _Json
+    monkeypatch.setitem(sys.modules, "psycopg2", fake_psycopg2)
+    monkeypatch.setitem(sys.modules, "psycopg2.extras", fake_extras)
+
+    monkeypatch.setenv(
+        "POSTGRES_URL",
+        "postgresql://brainclaw:brainclaw_secret@postgres:5432/brainclaw",
+    )
+
+    repository = build_postgres_repository_from_env()
+
+    assert isinstance(repository, PostgresLosslessRepository)
+
+
+def test_build_memory_item_preserves_non_uuid_lcm_ids_in_metadata_and_not_uuid_columns(tmp_path):
+    engine, _repo = _build_engine(tmp_path)
+
+    summaries = list(engine.adapter.iter_summary_artifacts())
+    summary = next(item for item in summaries if item["source_artifact_id"] == "sum-stateful")
+    report = engine.adapter.detect().to_dict()
+    artifact = engine._build_source_artifact(summary, report, "stateful")
+    candidate = engine._extract_candidates(summary, artifact["source_artifact_id"])[0]
+    candidate["visibility_scope"] = artifact["visibility_scope"]
+    candidate["access_control"] = dict(artifact["access_control"])
+    memory_item = engine._build_memory_item(candidate, summary, artifact)
+
+    assert memory_item["source_session_id"] is None
+    assert memory_item["source_message_id"] is None
+    assert memory_item["metadata"]["source_session_id"] == "stateful-session-1"
+    assert memory_item["metadata"]["original_message_ids"] == ["10"]
+
+
+def test_extract_candidates_emits_relationship_and_procedure_candidates_for_operational_lcm_summary(tmp_path):
+    engine, _repo = _build_engine(tmp_path)
+
+    summary = {
+        "source_artifact_id": "sum-operational",
+        "source_session_id": "stateful-session-ops",
+        "source_conversation_id": 99,
+        "kind": "conversation",
+        "summary_depth": 0,
+        "content": (
+            "1. Restart ajf-openclaw. "
+            "2. Run BrainClaw migrations. "
+            "3. Verify the logs are healthy. "
+            "BrainClaw uses PostgreSQL for canonical storage."
+        ),
+        "source_created_at": "2026-03-18T13:00:00Z",
+        "earliest_source_timestamp": "2026-03-18T12:55:00Z",
+        "latest_source_timestamp": "2026-03-18T13:00:00Z",
+        "file_ids": [],
+        "source_parent_summary_id": None,
+        "topic_hints": ["brainclaw", "postgresql", "procedure"],
+        "original_message_ids": ["1001"],
+    }
+
+    candidates = engine._extract_candidates(summary, "artifact-operational")
+    candidate_types = {candidate["candidate_type"] for candidate in candidates}
+    relationship_candidate = next(
+        candidate for candidate in candidates if candidate["candidate_type"] == "RelationshipCandidate"
+    )
+
+    assert "ProcedureCandidate" in candidate_types
+    assert "RelationshipCandidate" in candidate_types
+    assert relationship_candidate["structured_payload"]["source_entity_name"] == "BrainClaw"
+    assert relationship_candidate["structured_payload"]["target_entity_name"] == "PostgreSQL"
+
+
+def test_graph_records_from_promoted_candidates_links_relationships_by_stable_names():
+    from openclaw_memory.integration.lossless_sync import _graph_records_from_candidates
+
+    candidates = [
+        {
+            "candidate_type": "EntityCandidate",
+            "source_artifact_id": "artifact-a",
+            "content": "BrainClaw",
+            "structured_payload": {
+                "entity_type": "system",
+                "canonical_name": "brainclaw",
+                "extracted_entity_id": "entity-src-a",
+            },
+            "promoted_memory_item_id": "entity-brainclaw",
+            "raw_extraction_confidence": 0.9,
+            "interpretive_confidence": 0.0,
+            "promotion_status": "promoted",
+        },
+        {
+            "candidate_type": "EntityCandidate",
+            "source_artifact_id": "artifact-a",
+            "content": "PostgreSQL",
+            "structured_payload": {
+                "entity_type": "system",
+                "canonical_name": "postgresql",
+                "extracted_entity_id": "entity-src-b",
+            },
+            "promoted_memory_item_id": "entity-postgresql",
+            "raw_extraction_confidence": 0.9,
+            "interpretive_confidence": 0.0,
+            "promotion_status": "promoted",
+        },
+        {
+            "candidate_type": "RelationshipCandidate",
+            "source_artifact_id": "artifact-a",
+            "content": "BrainClaw uses PostgreSQL",
+            "structured_payload": {
+                "relationship_type": "uses",
+                "source_entity_id": "entity-src-a",
+                "target_entity_id": "entity-src-b",
+                "source_entity_name": "BrainClaw",
+                "target_entity_name": "PostgreSQL",
+                "source_entity_canonical_name": "brainclaw",
+                "target_entity_canonical_name": "postgresql",
+                "evidence": "BrainClaw uses PostgreSQL",
+            },
+            "promoted_memory_item_id": "rel-brainclaw-postgresql",
+            "raw_extraction_confidence": 0.0,
+            "interpretive_confidence": 0.72,
+            "promotion_status": "promoted",
+        },
+    ]
+
+    entities, relationships = _graph_records_from_candidates(candidates)
+
+    assert {entity.id for entity in entities} == {"entity-brainclaw", "entity-postgresql"}
+    assert len(relationships) == 1
+    assert relationships[0].source_entity_id == "entity-brainclaw"
+    assert relationships[0].target_entity_id == "entity-postgresql"
+    assert relationships[0].relationship_type == "uses"
+
+
+def test_graph_records_from_promoted_candidates_respects_artifact_scoped_entity_identity():
+    from openclaw_memory.integration.lossless_sync import _graph_records_from_candidates
+
+    candidates = [
+        {
+            "candidate_type": "EntityCandidate",
+            "source_artifact_id": "artifact-a",
+            "content": "BrainClaw",
+            "structured_payload": {
+                "entity_type": "system",
+                "canonical_name": "brainclaw",
+                "extracted_entity_id": "artifact-a-brainclaw",
+            },
+            "promoted_memory_item_id": "entity-a-brainclaw",
+            "promotion_status": "promoted",
+        },
+        {
+            "candidate_type": "EntityCandidate",
+            "source_artifact_id": "artifact-b",
+            "content": "BrainClaw",
+            "structured_payload": {
+                "entity_type": "system",
+                "canonical_name": "brainclaw",
+                "extracted_entity_id": "artifact-b-brainclaw",
+            },
+            "promoted_memory_item_id": "entity-b-brainclaw",
+            "promotion_status": "promoted",
+        },
+        {
+            "candidate_type": "EntityCandidate",
+            "source_artifact_id": "artifact-b",
+            "content": "Lossless-Claw",
+            "structured_payload": {
+                "entity_type": "system",
+                "canonical_name": "lossless-claw",
+                "extracted_entity_id": "artifact-b-lossless",
+            },
+            "promoted_memory_item_id": "entity-b-lossless",
+            "promotion_status": "promoted",
+        },
+        {
+            "candidate_type": "RelationshipCandidate",
+            "source_artifact_id": "artifact-b",
+            "content": "BrainClaw collaborates_with Lossless-Claw",
+            "structured_payload": {
+                "relationship_type": "collaborates_with",
+                "source_entity_id": "artifact-b-brainclaw",
+                "target_entity_id": "artifact-b-lossless",
+                "source_entity_name": "BrainClaw",
+                "target_entity_name": "Lossless-Claw",
+                "source_entity_canonical_name": "brainclaw",
+                "target_entity_canonical_name": "lossless-claw",
+            },
+            "promoted_memory_item_id": "rel-b",
+            "promotion_status": "promoted",
+        },
+    ]
+
+    _entities, relationships = _graph_records_from_candidates(candidates)
+
+    assert len(relationships) == 1
+    assert relationships[0].source_entity_id == "entity-b-brainclaw"
+    assert relationships[0].target_entity_id == "entity-b-lossless"
+
+
+def test_rebuild_marks_backfill_targets_from_canonical_records(tmp_path, monkeypatch):
+    from openclaw_memory.integration import lossless_sync
+
     engine, repo = _build_engine(tmp_path)
     engine.sync(mode="bootstrap")
+
+    captured: dict[str, int] = {}
+
+    def fake_rebuild(entities, relationships):
+        captured["entity_count"] = len(entities)
+        captured["relationship_count"] = len(relationships)
+        return {
+            "entity_count": len(entities),
+            "relationship_count": len(relationships),
+            "synced_count": len(entities) + len(relationships),
+        }
+
+    monkeypatch.setattr(lossless_sync, "_rebuild_neo4j_from_candidates", fake_rebuild)
 
     result = engine.rebuild("neo4j")
 
     assert result["status"] == "completed"
     assert result["target"] == "neo4j"
     assert result["memory_item_count"] == len(repo.memory_items)
+    assert result["entity_count"] == captured["entity_count"]
+    assert result["relationship_count"] == captured["relationship_count"]
+    assert result["synced_count"] == captured["entity_count"] + captured["relationship_count"]
     assert repo.rebuild_checkpoints["neo4j"]["status"] == "completed"
+    assert (
+        repo.rebuild_checkpoints["neo4j"]["last_validated_target_state"]["relationship_count"]
+        == captured["relationship_count"]
+    )
     assert sum(
         1 for state in repo.derived_backfill_state.values() if state["target"] == "neo4j"
     ) == len(repo.memory_items)
+
+
+def test_rebuild_neo4j_from_candidates_replaces_entity_graph_in_batched_writes(monkeypatch):
+    from openclaw_memory.integration import lossless_sync
+    from openclaw_memory.pipeline.extraction import Entity, Relationship
+
+    calls: list[tuple[str, dict[str, object]]] = []
+    captured_database: dict[str, str | None] = {"name": None}
+
+    class FakeSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def run(self, query, params=None):
+            calls.append((query, params or {}))
+
+    class FakeDriver:
+        def session(self, *, database=None):
+            captured_database["name"] = database
+            return FakeSession()
+
+        def close(self):
+            return None
+
+    fake_driver = FakeDriver()
+    fake_neo4j = types.ModuleType("neo4j")
+    fake_neo4j.GraphDatabase = types.SimpleNamespace(driver=lambda url, auth: fake_driver)
+    monkeypatch.setitem(sys.modules, "neo4j", fake_neo4j)
+    monkeypatch.setenv("NEO4J_DATABASE", "brainclaw-test")
+
+    result = lossless_sync._rebuild_neo4j_from_candidates(
+        [
+            Entity(id="entity-1", entity_type="system", name="BrainClaw", canonical_name="brainclaw", confidence=0.9),
+            Entity(
+                id="entity-2",
+                entity_type="system",
+                name="Lossless-Claw",
+                canonical_name="lossless-claw",
+                confidence=0.88,
+            ),
+        ],
+        [
+            Relationship(
+                id="rel-1",
+                source_entity_id="entity-1",
+                target_entity_id="entity-2",
+                relationship_type="integrates_with",
+                confidence=0.72,
+                evidence="BrainClaw integrates with Lossless-Claw",
+            )
+        ],
+    )
+
+    assert captured_database["name"] == "brainclaw-test"
+    assert len(calls) == 3
+    assert "MATCH (n:Entity)" in calls[0][0]
+    assert "DETACH DELETE n" in calls[0][0]
+    assert "UNWIND $entities AS entity" in calls[1][0]
+    assert calls[1][1]["entities"][0]["id"] == "entity-1"
+    assert "UNWIND $relationships AS relationship" in calls[2][0]
+    assert calls[2][1]["relationships"][0]["id"] == "rel-1"
+    assert result == {"entity_count": 2, "relationship_count": 1, "synced_count": 3}

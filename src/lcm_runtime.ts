@@ -14,6 +14,28 @@ function safeReadJson(filePath: string): Record<string, unknown> | null {
   }
 }
 
+function resolveOpenClawVersion(config: any, runtimeVersion?: string): string {
+  if (typeof runtimeVersion === "string" && runtimeVersion.trim()) {
+    const normalizedRuntimeVersion = runtimeVersion.trim();
+    if (normalizedRuntimeVersion.toLowerCase() !== "unknown") {
+      return normalizedRuntimeVersion;
+    }
+  }
+
+  const configuredVersion = config?.meta?.lastTouchedVersion;
+  if (typeof configuredVersion === "string" && configuredVersion.trim()) {
+    return configuredVersion.trim();
+  }
+
+  const packageJson = safeReadJson("/app/package.json");
+  const packageVersion = packageJson?.version;
+  if (typeof packageVersion === "string" && packageVersion.trim()) {
+    return packageVersion.trim();
+  }
+
+  return "unknown";
+}
+
 function collectToolNamesFromInstallPath(installPath?: string): string[] {
   if (!installPath) {
     return [];
@@ -73,7 +95,7 @@ export function buildLosslessClawRuntimeSnapshot(params: {
   const installPath = pluginConfig.losslessClawPluginPath || losslessInstall?.installPath;
 
   return {
-    openclaw_version: params.runtimeVersion || "unknown",
+    openclaw_version: resolveOpenClawVersion(params.config, params.runtimeVersion),
     memory_slot: typeof slots.memory === "string" ? slots.memory : null,
     context_engine_slot: typeof slots.contextEngine === "string" ? slots.contextEngine : null,
     plugin_installed: Boolean(losslessInstall),

@@ -16,7 +16,7 @@ from openclaw_memory.integration.lossless_adapter import (
     LosslessClawAdapter,
     ReasonCode,
 )
-from openclaw_memory.pipeline.extraction import extract_all
+from openclaw_memory.pipeline.extraction import Entity, Relationship, extract_all
 
 
 BRAINCLAW_NS = uuid.UUID("b4a1bc1a-0000-4000-a000-b4a1bc1ab000")
@@ -62,6 +62,15 @@ def _utcnow() -> datetime:
 def _deterministic_uuid(*parts: object) -> str:
     material = "::".join(str(part) for part in parts)
     return str(uuid.uuid5(BRAINCLAW_NS, material))
+
+
+def _optional_uuid_text(value: object) -> str | None:
+    if value in (None, ""):
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 def _artifact_hash(payload: dict[str, Any]) -> str:
@@ -129,6 +138,239 @@ def _candidate_content(summary_content: str, prefix: str | None = None) -> str:
     return first_sentence or summary_content.strip()
 
 
+def _looks_procedural(content: str) -> bool:
+    imperative_steps = re.findall(
+        r"(?:^|\n|\s)\d+\.\s*(restart|run|verify|install|configure|enable|disable|rebuild|check|open|sync|migrate)\b",
+        content,
+        flags=re.IGNORECASE,
+    )
+    return len(imperative_steps) >= 2
+
+
+def _graph_records_from_candidates(
+    candidates: list[dict[str, Any]],
+) -> tuple[list[Entity], list[Relationship]]:
+    entity_records: dict[str, Entity] = {}
+    name_index: dict[str, str] = {}
+    canonical_index: dict[str, str] = {}
+    artifact_entity_index: dict[tuple[str, str], str] = {}
+
+    def ensure_entity(
+        *,
+        entity_id: str | None,
+        name: str | None,
+        canonical_name: str | None,
+        entity_type: str | None = None,
+        confidence: float = 0.7,
+    ) -> Entity | None:
+        normalized_name = str(name or "").strip()
+        normalized_canonical = str(canonical_name or normalized_name).strip().lower()
+        if not normalized_name and not normalized_canonical:
+            return None
+
+        resolved_id = str(entity_id or _deterministic_uuid("graph_entity", normalized_canonical or normalized_name))
+        if resolved_id in entity_records:
+            return entity_records[resolved_id]
+
+        resolved_name = normalized_name or normalized_canonical.title()
+        entity = Entity(
+            id=resolved_id,
+            entity_type=str(entity_type or "concept"),
+            name=resolved_name,
+            canonical_name=normalized_canonical or resolved_name.lower(),
+            confidence=confidence,
+        )
+        entity_records[resolved_id] = entity
+        name_index[entity.name.lower()] = resolved_id
+        canonical_index[entity.canonical_name.lower()] = resolved_id
+        return entity
+
+    for candidate in candidates:
+        if candidate.get("candidate_type") != "EntityCandidate":
+            continue
+        payload = dict(candidate.get("structured_payload") or {})
+        source_artifact_id = str(candidate.get("source_artifact_id") or "")
+        confidence = float(
+            candidate.get("raw_extraction_confidence")
+            or candidate.get("interpretive_confidence")
+            or 0.7
+        )
+        entity = ensure_entity(
+            entity_id=str(candidate.get("promoted_memory_item_id") or candidate.get("id") or ""),
+            name=str(candidate.get("content") or ""),
+            canonical_name=payload.get("canonical_name"),
+            entity_type=payload.get("entity_type") or candidate.get("memory_type_target"),
+            confidence=confidence,
+        )
+        extracted_entity_id = str(payload.get("extracted_entity_id") or "").strip()
+        if entity is not None and source_artifact_id and extracted_entity_id:
+            artifact_entity_index[(source_artifact_id, extracted_entity_id)] = entity.id
+
+    relationships: list[Relationship] = []
+    seen_relationships: set[str] = set()
+
+    for candidate in candidates:
+        if candidate.get("candidate_type") != "RelationshipCandidate":
+            continue
+        payload = dict(candidate.get("structured_payload") or {})
+        source_artifact_id = str(candidate.get("source_artifact_id") or "")
+        source_canonical = str(payload.get("source_entity_canonical_name") or "").strip().lower()
+        target_canonical = str(payload.get("target_entity_canonical_name") or "").strip().lower()
+        source_name = str(payload.get("source_entity_name") or "").strip()
+        target_name = str(payload.get("target_entity_name") or "").strip()
+
+        source_entity_id = artifact_entity_index.get(
+            (source_artifact_id, str(payload.get("source_entity_id") or "").strip())
+        )
+        target_entity_id = artifact_entity_index.get(
+            (source_artifact_id, str(payload.get("target_entity_id") or "").strip())
+        )
+        if source_entity_id is None:
+            source_entity_id = canonical_index.get(source_canonical) or name_index.get(source_name.lower())
+        if target_entity_id is None:
+            target_entity_id = canonical_index.get(target_canonical) or name_index.get(target_name.lower())
+
+        source_entity = entity_records.get(source_entity_id) if source_entity_id else None
+        target_entity = entity_records.get(target_entity_id) if target_entity_id else None
+
+        if source_entity is None:
+            source_entity = ensure_entity(
+                entity_id=None,
+                name=source_name,
+                canonical_name=source_canonical,
+                entity_type="concept",
+            )
+        if target_entity is None:
+            target_entity = ensure_entity(
+                entity_id=None,
+                name=target_name,
+                canonical_name=target_canonical,
+                entity_type="concept",
+            )
+        if source_entity is None or target_entity is None:
+            continue
+
+        relationship_id = str(
+            candidate.get("promoted_memory_item_id")
+            or candidate.get("id")
+            or _deterministic_uuid(
+                "graph_relationship",
+                source_entity.id,
+                payload.get("relationship_type") or candidate.get("memory_type_target"),
+                target_entity.id,
+            )
+        )
+        if relationship_id in seen_relationships:
+            continue
+        seen_relationships.add(relationship_id)
+        relationships.append(
+            Relationship(
+                id=relationship_id,
+                source_entity_id=source_entity.id,
+                target_entity_id=target_entity.id,
+                relationship_type=str(
+                    payload.get("relationship_type")
+                    or candidate.get("memory_type_target")
+                    or "related_to"
+                ),
+                confidence=float(
+                    candidate.get("raw_extraction_confidence")
+                    or candidate.get("interpretive_confidence")
+                    or 0.7
+                ),
+                evidence=str(payload.get("evidence") or candidate.get("content") or ""),
+            )
+        )
+
+    return list(entity_records.values()), relationships
+
+
+def _rebuild_neo4j_from_candidates(
+    entities: list[Entity],
+    relationships: list[Relationship],
+) -> dict[str, Any]:
+    from neo4j import GraphDatabase
+
+    neo4j_url = os.getenv("NEO4J_URL", "bolt://neo4j-proxy:7687")
+    neo4j_user = os.getenv("NEO4J_USER", "neo4j")
+    neo4j_password = os.getenv("NEO4J_PASSWORD", "")
+    neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
+    batch_size = 250
+
+    driver = GraphDatabase.driver(neo4j_url, auth=(neo4j_user, neo4j_password))
+    try:
+        with driver.session(database=neo4j_database) as session:
+            # Rebuild the derived Entity graph deterministically from canonical PostgreSQL candidates.
+            session.run(
+                """
+                MATCH (n:Entity)
+                DETACH DELETE n
+                """
+            )
+            for start in range(0, len(entities), batch_size):
+                entity_batch = entities[start : start + batch_size]
+                if not entity_batch:
+                    continue
+                session.run(
+                    """
+                    UNWIND $entities AS entity
+                    MERGE (e:Entity {id: entity.id})
+                    SET e.name = entity.name,
+                        e.canonical_name = entity.canonical_name,
+                        e.entity_type = entity.entity_type,
+                        e.confidence = entity.confidence
+                    """,
+                    {
+                        "entities": [
+                            {
+                                "id": entity.id,
+                                "name": entity.name,
+                                "canonical_name": entity.canonical_name,
+                                "entity_type": entity.entity_type,
+                                "confidence": entity.confidence,
+                            }
+                            for entity in entity_batch
+                        ]
+                    },
+                )
+            for start in range(0, len(relationships), batch_size):
+                relationship_batch = relationships[start : start + batch_size]
+                if not relationship_batch:
+                    continue
+                session.run(
+                    """
+                    UNWIND $relationships AS relationship
+                    MATCH (s:Entity {id: relationship.source_id})
+                    MATCH (t:Entity {id: relationship.target_id})
+                    MERGE (s)-[r:RELATES {id: relationship.id}]->(t)
+                    SET r.relationship_type = relationship.relationship_type,
+                        r.confidence = relationship.confidence,
+                        r.evidence = relationship.evidence
+                    """,
+                    {
+                        "relationships": [
+                            {
+                                "id": relationship.id,
+                                "source_id": relationship.source_entity_id,
+                                "target_id": relationship.target_entity_id,
+                                "relationship_type": relationship.relationship_type,
+                                "confidence": relationship.confidence,
+                                "evidence": relationship.evidence,
+                            }
+                            for relationship in relationship_batch
+                        ]
+                    },
+                )
+    finally:
+        driver.close()
+
+    return {
+        "entity_count": len(entities),
+        "relationship_count": len(relationships),
+        "synced_count": len(entities) + len(relationships),
+    }
+
+
 class CanonicalLosslessRepository(Protocol):
     source_id: str
     source_type: str
@@ -144,6 +386,8 @@ class CanonicalLosslessRepository(Protocol):
     def upsert_memory_candidate(self, candidate: dict[str, Any]) -> str: ...
 
     def list_memory_items(self) -> list[dict[str, Any]]: ...
+
+    def list_promoted_candidates(self, candidate_types: list[str] | None = None) -> list[dict[str, Any]]: ...
 
     def upsert_memory_item(self, memory_item: dict[str, Any]) -> tuple[str, bool]: ...
 
@@ -232,6 +476,17 @@ class InMemoryLosslessRepository:
 
     def list_memory_items(self) -> list[dict[str, Any]]:
         return list(self.memory_items.values())
+
+    def list_promoted_candidates(self, candidate_types: list[str] | None = None) -> list[dict[str, Any]]:
+        records = [
+            dict(candidate)
+            for candidate in self.memory_candidates.values()
+            if candidate.get("promotion_status") == "promoted"
+        ]
+        if candidate_types:
+            allowed = set(candidate_types)
+            records = [record for record in records if record.get("candidate_type") in allowed]
+        return records
 
     def seed_memory_item(self, **memory_item: Any) -> str:
         memory_id = _deterministic_uuid("seed", memory_item.get("content"))
@@ -325,9 +580,10 @@ class LosslessClawSyncEngine:
             artifact_id, created = self.repository.upsert_source_artifact(artifact)
             if not created:
                 duplicate_artifact_count += 1
-                continue
-
-            source_artifact_count += 1
+                if mode != "repair":
+                    continue
+            else:
+                source_artifact_count += 1
 
             candidates = self._extract_candidates(summary, artifact_id)
             for candidate in candidates:
@@ -392,20 +648,32 @@ class LosslessClawSyncEngine:
         for memory_item in memory_items:
             self.repository.mark_backfill(memory_item["id"], normalized, status="pending")
 
+        validated_state: dict[str, Any] = {"memory_item_count": len(memory_items)}
+        response: dict[str, Any] = {
+            "status": "completed",
+            "target": normalized,
+            "memory_item_count": len(memory_items),
+        }
+
+        if normalized == "neo4j":
+            candidates = self.repository.list_promoted_candidates(
+                ["EntityCandidate", "RelationshipCandidate"]
+            )
+            entities, relationships = _graph_records_from_candidates(candidates)
+            counts = _rebuild_neo4j_from_candidates(entities, relationships)
+            validated_state.update(counts)
+            response.update(counts)
+
         self.repository.update_rebuild_checkpoint(
             normalized,
             {
                 "status": "completed",
                 "checkpoint_ref": _deterministic_uuid("rebuild", normalized, len(memory_items)),
                 "last_validated_at": _utcnow().isoformat(),
-                "last_validated_target_state": {"memory_item_count": len(memory_items)},
+                "last_validated_target_state": validated_state,
             },
         )
-        return {
-            "status": "completed",
-            "target": normalized,
-            "memory_item_count": len(memory_items),
-        }
+        return response
 
     def _build_source_artifact(
         self,
@@ -463,6 +731,7 @@ class LosslessClawSyncEngine:
     def _extract_candidates(self, summary: dict[str, Any], source_artifact_ref: str) -> list[dict[str, Any]]:
         content = summary["content"]
         extraction = extract_all(content)
+        entity_lookup = {entity.id: entity for entity in extraction.entities}
         topic_hints = summary["topic_hints"]
         candidates: list[dict[str, Any]] = []
 
@@ -496,6 +765,8 @@ class LosslessClawSyncEngine:
             )
 
         for relationship in extraction.relationships:
+            source_entity = entity_lookup.get(relationship.source_entity_id)
+            target_entity = entity_lookup.get(relationship.target_entity_id)
             memory_class_target, memory_type_target = _candidate_targets(
                 "RelationshipCandidate",
                 {"relationship_type": relationship.relationship_type},
@@ -506,11 +777,20 @@ class LosslessClawSyncEngine:
                     "candidate_type": "RelationshipCandidate",
                     "memory_class_target": memory_class_target,
                     "memory_type_target": memory_type_target,
-                    "content": relationship.evidence or f"{relationship.source_entity_id} {relationship.relationship_type} {relationship.target_entity_id}",
+                    "content": (
+                        f"{source_entity.name if source_entity else relationship.source_entity_id} "
+                        f"{relationship.relationship_type} "
+                        f"{target_entity.name if target_entity else relationship.target_entity_id}"
+                    ),
                     "structured_payload": {
                         "relationship_type": relationship.relationship_type,
                         "source_entity_id": relationship.source_entity_id,
                         "target_entity_id": relationship.target_entity_id,
+                        "source_entity_name": source_entity.name if source_entity else None,
+                        "target_entity_name": target_entity.name if target_entity else None,
+                        "source_entity_canonical_name": source_entity.canonical_name if source_entity else None,
+                        "target_entity_canonical_name": target_entity.canonical_name if target_entity else None,
+                        "evidence": relationship.evidence,
                     },
                     "raw_extraction_confidence": round(min(relationship.confidence, 0.69), 2),
                     "interpretive_confidence": 0.72,
@@ -534,7 +814,10 @@ class LosslessClawSyncEngine:
         ]
         lowered = content.lower()
         for candidate_type, markers, raw_conf, interpretive_conf, topic_score, interpretation_flag, label in heuristic_specs:
-            if not any(marker in lowered for marker in markers):
+            marker_match = any(marker in lowered for marker in markers)
+            if candidate_type == "ProcedureCandidate":
+                marker_match = marker_match or _looks_procedural(content)
+            if not marker_match:
                 continue
             memory_class_target, memory_type_target = _candidate_targets(candidate_type, {})
             candidates.append(
@@ -601,8 +884,10 @@ class LosslessClawSyncEngine:
             "memory_type": candidate["memory_type_target"],
             "status": "active",
             "content": candidate["content"],
-            "source_session_id": summary["source_session_id"],
-            "source_message_id": summary["original_message_ids"][0] if summary["original_message_ids"] else None,
+            "source_session_id": _optional_uuid_text(summary["source_session_id"]),
+            "source_message_id": _optional_uuid_text(
+                summary["original_message_ids"][0] if summary["original_message_ids"] else None
+            ),
             "confidence": candidate.get("raw_extraction_confidence") or candidate.get("interpretive_confidence") or 0.5,
             "user_confirmed": False,
             "visibility_scope": candidate["visibility_scope"],
@@ -654,9 +939,10 @@ class PostgresLosslessRepository:
 
     def __init__(self, dsn: str, source_id: str, source_type: str):
         import psycopg2
+        from psycopg2 import extras
 
         self._psycopg2 = psycopg2
-        self._json = psycopg2.extras.Json
+        self._json = extras.Json
         self.dsn = dsn
         self.source_id = source_id
         self.source_type = source_type
@@ -851,13 +1137,13 @@ class PostgresLosslessRepository:
                         artifact.get("verification_result"),
                         artifact["compatibility_state"],
                         artifact.get("reason_code"),
-                        artifact.get("workspace_id"),
-                        artifact.get("agent_id"),
-                        artifact.get("session_id"),
-                        artifact.get("project_id"),
-                        artifact.get("user_id"),
+                        _optional_uuid_text(artifact.get("workspace_id")),
+                        _optional_uuid_text(artifact.get("agent_id")),
+                        _optional_uuid_text(artifact.get("session_id")),
+                        _optional_uuid_text(artifact.get("project_id")),
+                        _optional_uuid_text(artifact.get("user_id")),
                         artifact.get("visibility_scope"),
-                        artifact.get("owner_id"),
+                        _optional_uuid_text(artifact.get("owner_id")),
                         artifact.get("statefulness"),
                         self._json(artifact["access_control"]),
                         artifact.get("import_status"),
@@ -940,14 +1226,14 @@ class PostgresLosslessRepository:
                         self._json(candidate["derivation_path"]),
                         self._json(candidate["topic_hints"]),
                         self._json(candidate["original_message_ids"]),
-                        candidate.get("supersession_id"),
-                        candidate.get("workspace_id"),
-                        candidate.get("agent_id"),
-                        candidate.get("source_session_id"),
-                        candidate.get("project_id"),
-                        candidate.get("user_id"),
+                        _optional_uuid_text(candidate.get("supersession_id")),
+                        _optional_uuid_text(candidate.get("workspace_id")),
+                        _optional_uuid_text(candidate.get("agent_id")),
+                        _optional_uuid_text(candidate.get("source_session_id")),
+                        _optional_uuid_text(candidate.get("project_id")),
+                        _optional_uuid_text(candidate.get("user_id")),
                         candidate.get("visibility_scope"),
-                        candidate.get("owner_id"),
+                        _optional_uuid_text(candidate.get("owner_id")),
                         candidate.get("statefulness"),
                         self._json(candidate["access_control"]),
                         _utcnow(),
@@ -959,6 +1245,29 @@ class PostgresLosslessRepository:
         with self._connect() as conn:
             with conn.cursor(cursor_factory=self._psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("SELECT id, content FROM memory_items WHERE is_current = TRUE")
+                return [dict(row) for row in cur.fetchall()]
+
+    def list_promoted_candidates(self, candidate_types: list[str] | None = None) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            with conn.cursor(cursor_factory=self._psycopg2.extras.RealDictCursor) as cur:
+                if candidate_types:
+                    cur.execute(
+                        """
+                        SELECT *
+                        FROM memory_candidates
+                        WHERE promotion_status = 'promoted'
+                          AND candidate_type = ANY(%s)
+                        """,
+                        (candidate_types,),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT *
+                        FROM memory_candidates
+                        WHERE promotion_status = 'promoted'
+                        """
+                    )
                 return [dict(row) for row in cur.fetchall()]
 
     def upsert_memory_item(self, memory_item: dict[str, Any]) -> tuple[str, bool]:
@@ -1014,8 +1323,8 @@ class PostgresLosslessRepository:
                         memory_item["memory_type"],
                         memory_item["status"],
                         memory_item["content"],
-                        memory_item.get("source_session_id"),
-                        memory_item.get("source_message_id"),
+                        _optional_uuid_text(memory_item.get("source_session_id")),
+                        _optional_uuid_text(memory_item.get("source_message_id")),
                         "lossless-claw",
                         "lossless-sync-v1",
                         _utcnow(),

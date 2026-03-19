@@ -105,7 +105,7 @@ def test_lcm_sync_bridge_uses_sync_engine_when_canonical_repository_is_available
 
     result = lcm_sync(
         runtime={
-            "openclaw_version": "2026.3.13",
+            "openclaw_version": "2026.3.14",
             "memory_slot": "brainclaw",
             "context_engine_slot": "lossless-claw",
             "plugin_enabled": True,
@@ -138,6 +138,14 @@ def test_lcm_rebuild_bridge_uses_canonical_repository_when_available(monkeypatch
     monkeypatch.setattr(
         "openclaw_memory.integration.lossless_sync.build_postgres_repository_from_env",
         lambda *args, **kwargs: repo,
+    )
+    monkeypatch.setattr(
+        "openclaw_memory.integration.lossless_sync._rebuild_neo4j_from_candidates",
+        lambda entities, relationships: {
+            "entity_count": len(entities),
+            "relationship_count": len(relationships),
+            "synced_count": len(entities) + len(relationships),
+        },
     )
 
     result = lcm_rebuild(target="neo4j")

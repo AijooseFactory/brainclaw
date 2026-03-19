@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { callPythonBackend, setSpawn } from "../dist/bridge.js";
+import { buildLosslessClawRuntimeSnapshot } from "../dist/lcm_runtime.js";
 
 const baseBridgeConfig = {
   brainclawSecret: "test-secret",
@@ -187,4 +188,51 @@ test("Bridge Identity: does not fabricate team or tenant defaults when runtime c
   assert.ok(!("teamId" in decoded), "teamId should be omitted when OpenClaw does not provide one");
   assert.ok(!("tenantId" in decoded), "tenantId should be omitted when OpenClaw does not provide one");
   assert.strictEqual(capturedEnv.TEAM_ID, undefined, "TEAM_ID should not be fabricated by the bridge");
+});
+
+test("Bridge Security: allows Lossless-Claw integration bridge entrypoints", async () => {
+  const calls = [];
+
+  setSpawn((_executable, args) => {
+    calls.push(args[1]);
+    return {
+      stdout: {
+        on(event, cb) {
+          if (event === "data") cb(Buffer.from(JSON.stringify({ status: "ok" })));
+        },
+      },
+      stderr: { on: () => {} },
+      on(event, cb) {
+        if (event === "close") cb(0);
+      },
+      kill() {},
+    };
+  });
+
+  await callPythonBackend("bridge_entrypoints", "lcm_status", {}, baseBridgeConfig);
+  await callPythonBackend("bridge_entrypoints", "lcm_sync", { mode: "bootstrap" }, baseBridgeConfig);
+  await callPythonBackend("bridge_entrypoints", "lcm_rebuild", { target: "neo4j" }, baseBridgeConfig);
+
+  assert.strictEqual(calls.length, 3);
+});
+
+test("LCM Runtime: falls back when runtime version is unavailable or unknown", () => {
+  const runtime = buildLosslessClawRuntimeSnapshot({
+    config: {
+      meta: { lastTouchedVersion: "2026.3.14" },
+      plugins: {
+        slots: { memory: "brainclaw", contextEngine: "lossless-claw" },
+        installs: {
+          "lossless-claw": {
+            installPath: "/tmp/lossless-claw-sync",
+            version: "0.4.0",
+          },
+        },
+      },
+    },
+    pluginConfig: {},
+    runtimeVersion: "unknown",
+  });
+
+  assert.strictEqual(runtime.openclaw_version, "2026.3.14");
 });

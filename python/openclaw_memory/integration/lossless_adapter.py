@@ -42,7 +42,7 @@ class PromotionThresholds:
     TOPIC_HINT_MATCH = 0.60
 
 
-SUPPORTED_OPENCLAW_BASELINES = {"2026.3.13"}
+MIN_SUPPORTED_OPENCLAW_BASELINE = (2026, 3, 14)
 SUPPORTED_LOSSLESS_CLAW_VERSIONS = {"0.4.0"}
 
 REQUIRED_SCHEMA: Dict[str, set[str]] = {
@@ -150,7 +150,10 @@ class LosslessClawAdapter:
         )
         if configured:
             return str(configured)
-        return None
+        state_dir = os.getenv("OPENCLAW_STATE_DIR")
+        if state_dir:
+            return str(Path(state_dir).expanduser() / "lcm.db")
+        return str(Path.home() / ".openclaw" / "lcm.db")
 
     def _compile_patterns(self, key: str, env_key: str) -> list[re.Pattern[str]]:
         configured = self.plugin_config.get(key)
@@ -233,6 +236,13 @@ class LosslessClawAdapter:
             if not required_columns <= set(discovered.get(table_name, [])):
                 return fingerprint, None
         return fingerprint, "lossless-claw-v0.4.0-core"
+
+    @staticmethod
+    def _parse_openclaw_version(version: str) -> Optional[tuple[int, int, int]]:
+        match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", str(version or "").strip())
+        if not match:
+            return None
+        return tuple(int(group) for group in match.groups())
 
     @staticmethod
     def _load_json_list(value: Any) -> list[Any]:
@@ -373,7 +383,11 @@ class LosslessClawAdapter:
                 plugin_version=self.runtime.plugin_version,
             )
 
-        if self.runtime.openclaw_version not in SUPPORTED_OPENCLAW_BASELINES:
+        parsed_openclaw_version = self._parse_openclaw_version(self.runtime.openclaw_version)
+        if (
+            parsed_openclaw_version is None
+            or parsed_openclaw_version < MIN_SUPPORTED_OPENCLAW_BASELINE
+        ):
             return LosslessClawDetectionReport(
                 compatibility_state=CompatibilityState.INSTALLED_INCOMPATIBLE,
                 reason_code=ReasonCode.OPENCLAW_VERSION_UNSUPPORTED.value,
