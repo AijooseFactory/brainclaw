@@ -1,179 +1,164 @@
-# BrainClaw PRD v3.0 Implementation Handoff
+# BrainClaw Handoff
 
-> **Last updated:** 2026-03-19 (contract alignment + runtime validation pass)  
-> **Branch:** `codex/lossless-claw-integration`  
-> **Container:** `ajf-openclaw` (volume-mounted at `/home/node/.openclaw/extensions/brainclaw`)
+> Last updated: 2026-03-19  
+> Branch: `main`  
+> Head: `957d812`  
+> Live OpenClaw mount: `./brainclaw-sync -> /home/node/.openclaw/extensions/brainclaw`
 
----
+## Current Truth
 
-## 2026-03-19 Latest Continuation State
+This repository is no longer on a feature branch. The active integration work was merged to `main`, and the current repo head is:
 
-### Contract alignment updates completed
-- README rewritten to match final PRD contract surface (runtime gate, canonical authority, thresholds, drill-down order, rollout safety, command contract).
-- `openclaw.plugin.json` extended with explicit `lcmContract` metadata:
-  - compatibility states
-  - runtime gate checks
-  - operational commands
-- `specs/001-authoritative-memory-backend/data-model.md` rewritten with final canonical table/field contracts:
-  - exact-once `artifact_hash` + composite key
-  - ACL/scope fields
-  - provenance payload
-  - reason codes
-  - candidate taxonomy + candidate->memory mapping
-  - deterministic replay rule
+- `957d812` `chore: stop tracking local codex and specify artifacts`
 
-### Runtime + CLI hardening completed
-- Runtime snapshot now includes plugin registration state and runtime-tool-source handling:
-  - `plugin_registered`
-  - stricter `plugin_enabled` gate requires registered plugin entry
-  - runtime tool names preferred when present; install-path scan fallback retained
-- `lcm status`, `lcm sync`, and `rebuild` surfaces now include operational state payloads:
-  - `integration_state`
-  - `checkpoint_state`
-  - `degraded_state_details`
-  - `replay_status`
-  - `backfill_required_state`
-  - `rebuild_status` / `rebuild_checkpoint`
-- Bridge error handling now parses JSON error payloads even on non-zero Python exits.
-- `lcm status` payload is now JSON-safe (datetime fields normalized to ISO strings).
+Important recent commits on `main`:
 
-### Live runtime validation in `ajf-openclaw`
-- `docker ps` confirms `ajf-openclaw` healthy.
-- `brainclaw memory sync` succeeds.
-- `brainclaw lcm status` now succeeds in live runtime and reports:
-  - `compatibility_state: installed_compatible`
-  - checkpoint state
-  - replay status
-  - backfill-required summary
-  - rebuild checkpoint details
+- `50f8a3f` `feat: align lcm integration contract, runtime gating, and status surfaces`
+- `7af6ca1` `Update README.md`
+- `7f892ce` `chore: ignore local codex prompt artifacts`
+- `957d812` `chore: stop tracking local codex and specify artifacts`
 
-### Test evidence from this pass
-- Node tests: `npm test` -> **35/35 passing**
-- Python contract/integration suite:
-  - `python/tests/test_lossless_claw_contract.py`
-  - `python/tests/test_lossless_claw_sync.py`
-  - `python/tests/test_lossless_claw_bridge.py`
-  - `python/tests/test_operational_memory_sync.py`
-  - `python/tests/test_memory_contract.py`
-  -> **43/43 passing**
+Do not use older notes that refer to `codex/lossless-claw-integration`. That branch is obsolete for current continuation work.
 
-### Notes for next agent
-- This repository includes a pre-existing modified set in:
-  - `python/tests/test_brainclaw_core.py`
-  - `src/tools/ingest.ts`
-  - `tests/tools.test.js`
-  These were preserved and kept compatible with current passing Node/Python contract suites.
-- Some async tests in `python/tests/test_brainclaw_core.py` require async pytest plugin wiring; they are outside the LCM contract pass scope.
+## What Is Implemented
 
----
+BrainClaw on `main` includes:
 
-## Status: All PRD Functional Requirements Implemented ✅
+- OpenClaw runtime gating for Lossless-Claw integration
+- compatibility-state persistence and schema fingerprint handling
+- canonical LCM import into `source_artifacts`
+- staged candidate extraction and promotion pipeline
+- CLI surfaces for `brainclaw lcm status`, `sync`, `rebuild`, and `brainclaw memory sync`
+- operational memory sync features
+- PRD-aligned plugin manifest and canonical data-model documentation
 
-E2E tests: **10/10 passed** inside the live `ajf-openclaw` container.  
-Unit tests: **Python 40/40**, **Node 31/31** — zero regressions.
+Primary implementation files:
 
----
+- `src/lcm_runtime.ts`
+- `src/register_cli.ts`
+- `python/openclaw_memory/bridge_entrypoints.py`
+- `python/openclaw_memory/integration/lossless_adapter.py`
+- `python/openclaw_memory/integration/lossless_sync.py`
+- `python/openclaw_memory/integration/source_adapter.py`
+- `python/openclaw_memory/integration/artifact_validation.py`
+- `python/openclaw_memory/integration/operational_memory_sync.py`
+- `python/openclaw_memory/retrieval/drill_down.py`
+- `python/openclaw_memory/retrieval/intent.py`
+- `python/openclaw_memory/observability/lcm_metrics.py`
 
-## What Was Built
+## Live Runtime Verification
 
-### Phase 1 — High-Impact Gaps
-| FR | File | Purpose |
-|----|------|---------|
-| FR-004 | `python/openclaw_memory/integration/source_adapter.py` | SourceAdapter protocol + LCM/File/Manual adapters + registry |
-| FR-006 | `python/openclaw_memory/integration/artifact_validation.py` | Schema validation, size limits, enum checks, quarantine routing |
-| FR-013 | `python/openclaw_memory/integration/lossless_sync.py` | CANDIDATE_MAPPING aligned to PRD spec |
-| FR-014 | `python/openclaw_memory/pipeline/extraction.py` | Entity ontology expanded from 6 → 15 types |
+Freshly verified against the running `ajf-openclaw` container on 2026-03-19:
 
-### Phase 2 — Safety & Control
-| FR | File | Purpose |
-|----|------|---------|
-| FR-016 | `python/openclaw_memory/integration/promotion_override.py` | Privileged override controller + audit trail + multi-party |
-| FR-022/023 | `python/openclaw_memory/integration/lossless_sync.py` | ACL/scope fields wired from OpenClaw identity context |
-| FR-026 | `python/openclaw_memory/integration/sync_error_handling.py` | TransactionalSyncContext + RetryPolicy + exponential backoff |
+Command run:
 
-### Phase 3 — Intelligence & Retrieval
-| FR | File | Purpose |
-|----|------|---------|
-| FR-020 | `python/openclaw_memory/retrieval/drill_down.py` | 4-step drill-down engine (lcm_expand_query → lcm_expand → SQLite DAG → canonical-only) |
-| FR-021 | `python/openclaw_memory/retrieval/intent.py` | 10 intent types (4 new) + route selection logging |
+- `docker exec ajf-openclaw node /app/openclaw.mjs brainclaw lcm status`
 
-### Phase 4 — Operational Maturity
-| FR | File | Purpose |
-|----|------|---------|
-| FR-024 | `python/openclaw_memory/observability/lcm_metrics.py` | 8 Prometheus metrics with safe registration/fallback |
-| FR-030 | `python/openclaw_memory/integration/operations.py` | LCM migration enable/disable handler + runbooks |
-| FR-031 | ↑ same file | Storage quota config + retention policy enforcement |
-| FR-032 | ↑ same file | Pre-change snapshot tooling for `./data` directory |
-| FR-033 | ↑ same file | DAG integrity verifier + 7 operational runbooks |
+Verified runtime facts:
 
----
+- `compatibility_state: installed_compatible`
+- `openclaw_version: 2026.3.14`
+- `plugin_version: 0.4.0`
+- `schema_fingerprint: 273f618956474734`
+- `supported_profile: lossless-claw-v0.4.0-core`
+- runtime tools available:
+  - `lcm_grep`
+  - `lcm_describe`
+  - `lcm_expand_query`
+  - `lcm_expand`
 
-## What's Next (For Continuation)
+Verified operational state from the same run:
 
-### Priority 1: Merge to Main
-- Branch `codex/lossless-claw-integration` is ready for PR/merge to `main`
-- All tests pass, container is healthy
+- checkpoint status: `completed`
+- replay status: `completed`
+- Weaviate rebuild status: `completed`
+- Neo4j rebuild status: `completed`
+- Neo4j status included nonzero relationships: `relationship_count: 27`
 
-### Priority 2: Pre-Existing Test Failures  
-9 pre-existing failures in `python/tests/test_brainclaw_core.py`:
-- `TestTeamLookupDB` (4 tests) — asyncpg dependency issue
-- `TestMigrationRunner` (2 tests) — migration fixture issue
-- `TestMemoryClasses` (1 test) — class definition drift
-- `TestSetDbSessionContext` (2 tests) — connection mock issue
+## Fresh Test Evidence
 
-These are **NOT caused by this work** and exist on `main` as well.
+Freshly run on 2026-03-19:
 
-### Priority 3: Additional Test Coverage
-- Write E2E tests for full bootstrap → incremental sync → promotion pipeline
-- Add storage failure handling tests (AC-009)  
-- Add multi-agent isolation tests (AC-010)
-- Add rollback behavior tests (AC-013)
-- Add compatibility matrix test fixtures (§17.3)
+### Node
 
-### Priority 4: Production Hardening
-- Wire `TransactionalSyncContext` around the full `sync()` method (currently validation + dead-letter is wired, but full transactional wrapping needs repository support)
-- Wire `LCMMetricsHelper` calls into the sync engine for live metric collection
-- Wire `DrillDownEngine` into the retrieval path when `lcm_expand` tools are available
-- Implement actual PostgreSQL-backed retention cleanup in `RetentionEnforcer`
+Command:
 
----
+- `npm test`
 
-## Architecture Quick Reference
+Result:
 
-```
-brainclaw-sync/
-├── python/openclaw_memory/
-│   ├── integration/           # Core sync + adapters
-│   │   ├── lossless_sync.py   # Main sync engine (FR-007/008/009/010/013/022/023)
-│   │   ├── lossless_adapter.py# LCM detection (FR-001/002/003)
-│   │   ├── source_adapter.py  # SourceAdapter protocol (FR-004)
-│   │   ├── artifact_validation.py  # Validation + quarantine (FR-006)
-│   │   ├── promotion_override.py   # Override control + audit (FR-016)
-│   │   ├── sync_error_handling.py  # Rollback + retry (FR-026)
-│   │   └── operations.py     # Migration, quotas, snapshots, DAG (FR-030-033)
-│   ├── pipeline/
-│   │   └── extraction.py      # Entity extraction with 15 types (FR-014)
-│   ├── retrieval/
-│   │   ├── intent.py          # 10 intent types + route logging (FR-021)
-│   │   └── drill_down.py      # Query-time drill-down engine (FR-020)
-│   └── observability/
-│       └── lcm_metrics.py     # 8 Prometheus metrics (FR-024)
-├── src/                       # TypeScript/Node side
-└── tests/                     # Python + Node test suites
-```
+- `35` tests passed
+- `0` failed
 
-## Key Design Decisions
+### Python
 
-1. **Protocol-oriented adapters** (FR-004): `SourceAdapter` is a `runtime_checkable Protocol`, not an ABC, enabling duck-typing
-2. **Identity context passthrough** (FR-022/023): ACL fields flow from `identity_context` dict on the engine constructor into every source artifact
-3. **Fail-closed validation** (FR-006): Invalid artifacts are quarantined to dead-letter before extraction; validation is wired between `_build_source_artifact()` and `upsert_source_artifact()`
-4. **Multi-party overrides** (FR-016): Low-confidence overrides require 2+ approvals from admin/system_admin roles; automated paths are hard-blocked
-5. **Graceful metrics** (FR-024): `prometheus_client` is optional; metrics degrade silently if not installed
+Command:
 
-## Container Deployment Notes
+- `PYTHONPATH=python pytest -q python/tests/test_lossless_claw_contract.py python/tests/test_lossless_claw_sync.py python/tests/test_lossless_claw_bridge.py python/tests/test_operational_memory_sync.py python/tests/test_memory_contract.py`
 
-- `brainclaw-sync/` is **volume-mounted** into the container at `/home/node/.openclaw/extensions/brainclaw`
-- Changes to Python files are **immediately live** — no rebuild needed
-- After code changes: `docker restart ajf-openclaw` to pick up module-level changes
-- **Never** use `docker compose down -v` — this destroys `./data`
-- Always snapshot `./data` before schema or structural changes
+Result:
+
+- `43` tests passed
+- `0` failed
+- `1` warning about unknown pytest config option `asyncio_mode`
+
+## Repo Hygiene State
+
+This repo now ignores and no longer tracks:
+
+- `.codex/prompts`
+- `.specify`
+
+That cleanup was committed so those local artifacts should not be reintroduced into Git history unless explicitly intended.
+
+## README State
+
+The README on `main` currently reflects user-authored framing:
+
+- title: `# BrainClaw`
+- lead sentence begins: `BrainClaw is a Hybrid GraphRAG for OpenClaw memory plugin for OpenClaw.`
+
+Do not silently rewrite that wording without user approval. The user explicitly changed it.
+
+## Deployment Notes
+
+For the local `ajf-openclaw` deployment:
+
+- the authoritative OpenClaw state directory is `./data`
+- the live BrainClaw code mount is `./brainclaw-sync`
+- Python backend path inside container is `/home/node/.openclaw/extensions/brainclaw/python`
+
+Operational safety rules still apply:
+
+- do not run `docker compose down -v`
+- do not recreate with an empty `./data` mount
+- do not hand-edit `data/openclaw.json` or `plugins.installs`
+
+## Known Caveats
+
+- Live logs still warn when sensitive config values such as `postgresUrl` or `neo4jPassword` are configured as plaintext instead of `${ENV_VAR}` references.
+- `npm test` is a mocked/unit-level confirmation. It does not replace live container verification.
+- The Python verification above covered the current contract and integration suites, not every Python test file in the repo.
+
+## Recommended Next Checks
+
+If another agent continues from here, use this order:
+
+1. `git status --short --branch`
+2. `git log --oneline --decorate -n 5`
+3. `docker exec ajf-openclaw node /app/openclaw.mjs brainclaw lcm status`
+4. If touching integration code, rerun:
+   - `npm test`
+   - `PYTHONPATH=python pytest -q python/tests/test_lossless_claw_contract.py python/tests/test_lossless_claw_sync.py python/tests/test_lossless_claw_bridge.py python/tests/test_operational_memory_sync.py python/tests/test_memory_contract.py`
+
+## Do Not Assume
+
+Do not assume any of the following older handoff claims are still valid:
+
+- feature branch workflows
+- pending merge to `main`
+- stale README text
+- tracked `.codex/prompts` or `.specify`
+- zero-edge Neo4j state
+
+Use `main` and current runtime verification as the handoff baseline.
