@@ -47,6 +47,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.codex/prompts
+.specify
 
 # Sensitive Configuration
 .env
