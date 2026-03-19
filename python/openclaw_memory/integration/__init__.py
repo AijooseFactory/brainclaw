@@ -13,6 +13,11 @@ __all__ = [
     "ReasonCode",
     "PromotionThresholds",
     "OpenClawRuntimeSnapshot",
+    "SourceAdapter",
+    "SourceAdapterRegistry",
+    "LCMSourceAdapter",
+    "FileSourceAdapter",
+    "ManualSourceAdapter",
 ]
 
 
@@ -50,5 +55,27 @@ def __getattr__(name: str):
             "ReasonCode": ReasonCode,
             "PromotionThresholds": PromotionThresholds,
             "OpenClawRuntimeSnapshot": OpenClawRuntimeSnapshot,
+        }[name]
+    if name in {
+        "SourceAdapter",
+        "SourceAdapterRegistry",
+        "LCMSourceAdapter",
+        "FileSourceAdapter",
+        "ManualSourceAdapter",
+    }:
+        from .source_adapter import (
+            SourceAdapter,
+            SourceAdapterRegistry,
+            LCMSourceAdapter,
+            FileSourceAdapter,
+            ManualSourceAdapter,
+        )
+
+        return {
+            "SourceAdapter": SourceAdapter,
+            "SourceAdapterRegistry": SourceAdapterRegistry,
+            "LCMSourceAdapter": LCMSourceAdapter,
+            "FileSourceAdapter": FileSourceAdapter,
+            "ManualSourceAdapter": ManualSourceAdapter,
         }[name]
     raise AttributeError(name)

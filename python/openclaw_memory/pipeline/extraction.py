@@ -5,8 +5,12 @@ from uuid import uuid4
 import re
 
 
-# Entity types supported by extraction
-ENTITY_TYPES = ["person", "project", "system", "concept", "tool", "file"]
+# Entity types supported by extraction (FR-014: 14 domain-relevant types)
+ENTITY_TYPES = [
+    "person", "agent", "system", "project", "repository", "file",
+    "decision", "command", "organization", "resource", "environment",
+    "policy", "event", "tool", "concept",
+]
 
 # Relationship types supported
 RELATIONSHIP_TYPES = [
@@ -275,6 +279,163 @@ def extract_concepts(text: str) -> List[Entity]:
     return entities
 
 
+# --- FR-014 additional entity extractors ---
+
+# Agent patterns (named AI agents/assistants)
+AGENT_PATTERN = re.compile(
+    r'\b(Albert|Einstein|Blackwell|Babatunde|Zeke|Lore|Oliver Wendell|Agent Zero)\b'
+)
+
+
+def extract_agents(text: str) -> List[Entity]:
+    """Extract agent entities (named AI agents/assistants)."""
+    entities = []
+    seen: Set[str] = set()
+    for match in AGENT_PATTERN.finditer(text):
+        name = match.group(0)
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            entities.append(Entity(
+                entity_type="agent", name=name, confidence=0.9,
+            ))
+    return entities
+
+
+# Repository patterns
+REPO_PATTERN = re.compile(
+    r'\b([A-Za-z][A-Za-z0-9_-]+/[A-Za-z][A-Za-z0-9_-]+)\b'  # org/repo
+    r'|\b([a-z][a-z0-9_-]+\.git)\b',  # foo.git
+)
+
+
+def extract_repositories(text: str) -> List[Entity]:
+    """Extract repository entities."""
+    entities = []
+    seen: Set[str] = set()
+    for match in REPO_PATTERN.finditer(text):
+        name = match.group(1) or match.group(2)
+        if name and name.lower() not in seen:
+            seen.add(name.lower())
+            entities.append(Entity(
+                entity_type="repository", name=name, confidence=0.85,
+            ))
+    return entities
+
+
+def extract_decisions(text: str) -> List[Entity]:
+    """Extract decision entities from decision-indicating phrases."""
+    entities = []
+    seen: Set[str] = set()
+    for phrase in DECISION_PHRASES:
+        idx = text.lower().find(phrase)
+        if idx >= 0:
+            # Extract the clause after the decision phrase
+            rest = text[idx + len(phrase):].strip()
+            clause = rest.split(".")[0].strip()[:120]
+            if clause and clause.lower() not in seen:
+                seen.add(clause.lower())
+                entities.append(Entity(
+                    entity_type="decision", name=clause, confidence=0.7,
+                ))
+    return entities
+
+
+# Command patterns
+COMMAND_PATTERN = re.compile(
+    r'`([a-z][a-z0-9_-]*(?:\s+[a-z0-9_./-]+){0,5})`',
+    re.IGNORECASE,
+)
+
+
+def extract_commands(text: str) -> List[Entity]:
+    """Extract command entities (CLI commands in backticks)."""
+    entities = []
+    seen: Set[str] = set()
+    for match in COMMAND_PATTERN.finditer(text):
+        name = match.group(1).strip()
+        if len(name) > 3 and name.lower() not in seen:
+            seen.add(name.lower())
+            entities.append(Entity(
+                entity_type="command", name=name, confidence=0.8,
+            ))
+    return entities
+
+
+ORG_PATTERN = re.compile(
+    r'\b(AijooseFactory|Ai joose Factory|OpenAI|Google|Microsoft|Meta|Anthropic)\b',
+    re.IGNORECASE,
+)
+
+
+def extract_organizations(text: str) -> List[Entity]:
+    """Extract organization entities."""
+    entities = []
+    seen: Set[str] = set()
+    for match in ORG_PATTERN.finditer(text):
+        name = match.group(0)
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            entities.append(Entity(
+                entity_type="organization", name=name, confidence=0.85,
+            ))
+    return entities
+
+
+def extract_resources(text: str) -> List[Entity]:
+    """Extract resource entities (URLs, endpoints, services)."""
+    entities = []
+    seen: Set[str] = set()
+    url_pattern = re.compile(r'https?://[^\s)>"]+', re.IGNORECASE)
+    for match in url_pattern.finditer(text):
+        url = match.group(0).rstrip(".,;:")
+        if url.lower() not in seen:
+            seen.add(url.lower())
+            entities.append(Entity(
+                entity_type="resource", name=url, confidence=0.9,
+            ))
+    return entities
+
+
+ENV_PATTERN = re.compile(
+    r'\b(production|staging|development|dev|prod|local|ci|test)\s*(?:environment|env|server|cluster)\b',
+    re.IGNORECASE,
+)
+
+
+def extract_environments(text: str) -> List[Entity]:
+    """Extract environment entities."""
+    entities = []
+    seen: Set[str] = set()
+    for match in ENV_PATTERN.finditer(text):
+        name = match.group(0).strip()
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            entities.append(Entity(
+                entity_type="environment", name=name.title(), confidence=0.75,
+            ))
+    return entities
+
+
+def extract_policies(text: str) -> List[Entity]:
+    """Extract policy entities (rules, constraints, requirements)."""
+    entities = []
+    seen: Set[str] = set()
+    policy_markers = [
+        "must not", "must never", "must always", "required to",
+        "policy:", "rule:", "constraint:", "do not",
+    ]
+    for marker in policy_markers:
+        idx = text.lower().find(marker)
+        if idx >= 0:
+            clause = text[idx:].split(".")[0].strip()[:120]
+            if clause and clause.lower() not in seen:
+                seen.add(clause.lower())
+                entities.append(Entity(
+                    entity_type="policy", name=clause, confidence=0.7,
+                ))
+    return entities
+
+
 def extract_entities(text: str, method: str = "rule") -> List[Entity]:
     """Extract all entities from text using specified method.
     
@@ -291,13 +452,21 @@ def extract_entities(text: str, method: str = "rule") -> List[Entity]:
     # Rule-based extraction (primary)
     all_entities = []
     
-    # Extract each entity type
+    # Extract each entity type (FR-014: all 14 domain types + concept)
     all_entities.extend(extract_persons(text))
+    all_entities.extend(extract_agents(text))
     all_entities.extend(extract_projects(text))
     all_entities.extend(extract_systems(text))
     all_entities.extend(extract_tools(text))
     all_entities.extend(extract_files(text))
     all_entities.extend(extract_concepts(text))
+    all_entities.extend(extract_repositories(text))
+    all_entities.extend(extract_decisions(text))
+    all_entities.extend(extract_commands(text))
+    all_entities.extend(extract_organizations(text))
+    all_entities.extend(extract_resources(text))
+    all_entities.extend(extract_environments(text))
+    all_entities.extend(extract_policies(text))
     
     # Deduplicate by name
     seen: Set[str] = set()

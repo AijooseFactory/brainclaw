@@ -16,6 +16,10 @@ from openclaw_memory.integration.lossless_adapter import (
     LosslessClawAdapter,
     ReasonCode,
 )
+from openclaw_memory.integration.artifact_validation import (
+    validate_source_artifact,
+    sanitize_artifact,
+)
 from openclaw_memory.pipeline.extraction import Entity, Relationship, extract_all
 
 
@@ -43,15 +47,16 @@ STOPWORDS = {
     "with",
 }
 
+# FR-013: Memory-class mapping aligned to PRD §FR-013 spec
 CANDIDATE_MAPPING = {
-    "EntityCandidate": ("semantic", "fact"),
-    "RelationshipCandidate": ("relational", "relationship"),
-    "DecisionCandidate": ("decision", "technical"),
-    "ProcedureCandidate": ("procedural", "procedure"),
+    "EntityCandidate": ("identity", "semantic"),
+    "RelationshipCandidate": ("relational", "semantic"),
+    "DecisionCandidate": ("decision", "episodic"),
+    "ProcedureCandidate": ("procedural", "semantic"),
     "PreferenceCandidate": ("semantic", "preference"),
-    "IssueCandidate": ("episodic", "issue"),
+    "IssueCandidate": ("episodic", "semantic"),
     "EventCandidate": ("episodic", "event"),
-    "ConstraintCandidate": ("semantic", "rule"),
+    "ConstraintCandidate": ("semantic", "governance"),
 }
 
 
@@ -577,6 +582,23 @@ class LosslessClawSyncEngine:
                 continue
 
             artifact = self._build_source_artifact(summary, report, policy.statefulness)
+
+            # FR-006: Validate artifact before ingestion
+            validation = validate_source_artifact(artifact)
+            if not validation.valid:
+                if validation.should_quarantine:
+                    self.repository.record_dead_letter({
+                        "source_plugin": artifact.get("source_plugin", "lossless-claw"),
+                        "source_artifact_type": artifact.get("source_artifact_type"),
+                        "source_artifact_id": artifact.get("source_artifact_id"),
+                        "artifact_hash": artifact.get("artifact_hash"),
+                        "reason_code": "VALIDATION_FAILED",
+                        "error_message": "; ".join(validation.errors[:5]),
+                        "payload": artifact.get("payload"),
+                    })
+                continue
+            artifact = sanitize_artifact(artifact)
+
             artifact_id, created = self.repository.upsert_source_artifact(artifact)
             if not created:
                 duplicate_artifact_count += 1
