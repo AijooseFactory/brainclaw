@@ -388,6 +388,52 @@ def summarize_audit_health(
     }
 
 
+def _json_safe(value):
+    if isinstance(value, datetime.datetime):
+        return value.isoformat()
+    if isinstance(value, datetime.date):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+def _safe_repository_state_snapshot(repository):
+    checkpoint_state = None
+    integration_state = None
+    backfill_required_state = {"pending": 0, "failed": 0, "completed": 0}
+    rebuild_status: dict = {}
+    errors: list[str] = []
+
+    try:
+        checkpoint_state = repository.get_checkpoint()
+    except Exception as exc:  # pragma: no cover - defensive in live runtime
+        errors.append(str(exc))
+    try:
+        integration_state = repository.get_integration_state()
+    except Exception as exc:  # pragma: no cover - defensive in live runtime
+        errors.append(str(exc))
+    try:
+        backfill_required_state = repository.summarize_backfill_state()
+    except Exception as exc:  # pragma: no cover - defensive in live runtime
+        errors.append(str(exc))
+    try:
+        rebuild_status = repository.get_rebuild_status()
+    except Exception as exc:  # pragma: no cover - defensive in live runtime
+        errors.append(str(exc))
+
+    repository_error = "; ".join(errors) if errors else None
+    return (
+        _json_safe(checkpoint_state),
+        _json_safe(integration_state),
+        _json_safe(backfill_required_state),
+        _json_safe(rebuild_status),
+        repository_error,
+    )
+
+
 def lcm_status(runtime: Optional[dict] = None, plugin_config: Optional[dict] = None, **kwargs) -> dict:
     from openclaw_memory.integration.lossless_adapter import (
         LosslessClawAdapter,
@@ -402,9 +448,50 @@ def lcm_status(runtime: Optional[dict] = None, plugin_config: Optional[dict] = N
     )
     report = adapter.detect().to_dict()
     repository = build_postgres_repository_from_env()
+    checkpoint_state = None
+    integration_state = None
+    backfill_required_state = {"pending": 0, "failed": 0, "completed": 0}
+    rebuild_status = {}
+    repository_error = None
+
     if repository is not None:
-        repository.upsert_integration_state(report)
-    return report
+        try:
+            repository.upsert_integration_state(report)
+        except Exception as exc:  # pragma: no cover - defensive in live runtime
+            repository_error = str(exc)
+            repository = None
+        if repository is not None:
+            (
+                checkpoint_state,
+                integration_state,
+                backfill_required_state,
+                rebuild_status,
+                snapshot_error,
+            ) = _safe_repository_state_snapshot(repository)
+            repository_error = snapshot_error
+
+    response = {
+        **report,
+        "integration_state": integration_state,
+        "checkpoint_state": checkpoint_state,
+        "degraded_state_details": {
+            "reason_code": (integration_state or {}).get("reason_code") or report.get("reason_code"),
+            "last_degraded_reason_code": (integration_state or {}).get("last_degraded_reason_code"),
+            "last_degraded_transition_at": (integration_state or {}).get("last_degraded_transition_at"),
+            "last_successful_supported_profile": (integration_state or {}).get("last_successful_supported_profile")
+            or report.get("supported_profile"),
+        },
+        "replay_status": {
+            "status": (checkpoint_state or {}).get("status"),
+            "retry_count": (checkpoint_state or {}).get("retry_count"),
+            "replay_marker": (checkpoint_state or {}).get("replay_marker"),
+        },
+        "backfill_required_state": backfill_required_state,
+        "rebuild_status": rebuild_status,
+    }
+    if repository_error:
+        response["repository_error"] = repository_error
+    return response
 
 
 def lcm_sync(
@@ -437,6 +524,16 @@ def lcm_sync(
                 "mode": mode,
                 "compatibility_state": status["compatibility_state"],
                 "reason_code": status.get("reason_code"),
+                "checkpoint_state": None,
+                "replay_status": {"status": None, "retry_count": None, "replay_marker": None},
+                "backfill_required_state": {"pending": 0, "failed": 0, "completed": 0},
+                "degraded_state_details": {
+                    "reason_code": status.get("reason_code"),
+                    "last_degraded_reason_code": None,
+                    "last_degraded_transition_at": None,
+                    "last_successful_supported_profile": status.get("supported_profile"),
+                },
+                "rebuild_status": {},
             }
         return {
             "status": "failed",
@@ -444,10 +541,70 @@ def lcm_sync(
             "compatibility_state": status["compatibility_state"],
             "reason_code": status.get("reason_code"),
             "error": "Canonical PostgreSQL repository unavailable",
+            "checkpoint_state": None,
+            "replay_status": {"status": None, "retry_count": None, "replay_marker": None},
+            "backfill_required_state": {"pending": 0, "failed": 0, "completed": 0},
+            "degraded_state_details": {
+                "reason_code": status.get("reason_code"),
+                "last_degraded_reason_code": None,
+                "last_degraded_transition_at": None,
+                "last_successful_supported_profile": status.get("supported_profile"),
+            },
+            "rebuild_status": {},
         }
 
-    engine = LosslessClawSyncEngine(adapter=adapter, repository=repository)
-    return engine.sync(mode=mode)
+    checkpoint_state = None
+    integration_state = None
+    backfill_required_state = {"pending": 0, "failed": 0, "completed": 0}
+    rebuild_status = {}
+    repository_error = None
+    try:
+        engine = LosslessClawSyncEngine(adapter=adapter, repository=repository)
+        result = engine.sync(mode=mode)
+    except Exception as exc:
+        result = {
+            "status": "failed",
+            "mode": mode,
+            "compatibility_state": status["compatibility_state"],
+            "reason_code": status.get("reason_code"),
+            "error": "Canonical sync failure",
+        }
+        repository_error = str(exc)
+
+    (
+        checkpoint_state,
+        integration_state,
+        backfill_required_state,
+        rebuild_status,
+        snapshot_error,
+    ) = _safe_repository_state_snapshot(repository)
+    if snapshot_error:
+        repository_error = "; ".join(
+            [part for part in [repository_error, snapshot_error] if part]
+        )
+
+    response = {
+        **result,
+        "integration_state": integration_state,
+        "checkpoint_state": checkpoint_state,
+        "degraded_state_details": {
+            "reason_code": (integration_state or {}).get("reason_code") or result.get("reason_code"),
+            "last_degraded_reason_code": (integration_state or {}).get("last_degraded_reason_code"),
+            "last_degraded_transition_at": (integration_state or {}).get("last_degraded_transition_at"),
+            "last_successful_supported_profile": (integration_state or {}).get("last_successful_supported_profile")
+            or status.get("supported_profile"),
+        },
+        "replay_status": {
+            "status": (checkpoint_state or {}).get("status"),
+            "retry_count": (checkpoint_state or {}).get("retry_count"),
+            "replay_marker": (checkpoint_state or {}).get("replay_marker"),
+        },
+        "backfill_required_state": backfill_required_state,
+        "rebuild_status": rebuild_status,
+    }
+    if repository_error:
+        response["repository_error"] = repository_error
+    return response
 
 
 def lcm_rebuild(target: str = "", **kwargs) -> dict:
@@ -462,10 +619,42 @@ def lcm_rebuild(target: str = "", **kwargs) -> dict:
             "status": "failed",
             "target": str(target or "").strip().lower(),
             "error": "Canonical PostgreSQL repository unavailable",
+            "rebuild_checkpoint": None,
+            "backfill_required_state": {"pending": 0, "failed": 0, "completed": 0},
         }
 
-    engine = LosslessClawSyncEngine(adapter=None, repository=repository)
-    return engine.rebuild(target)
+    repository_error = None
+    try:
+        engine = LosslessClawSyncEngine(adapter=None, repository=repository)
+        result = engine.rebuild(target)
+    except Exception as exc:
+        result = {
+            "status": "failed",
+            "target": str(target or "").strip().lower(),
+            "error": "Canonical rebuild failure",
+        }
+        repository_error = str(exc)
+
+    (
+        _checkpoint_state,
+        _integration_state,
+        backfill_required_state,
+        rebuild_status,
+        snapshot_error,
+    ) = _safe_repository_state_snapshot(repository)
+    if snapshot_error:
+        repository_error = "; ".join(
+            [part for part in [repository_error, snapshot_error] if part]
+        )
+    normalized_target = str(target or "").strip().lower()
+    response = {
+        **result,
+        "rebuild_checkpoint": rebuild_status.get(normalized_target),
+        "backfill_required_state": backfill_required_state,
+    }
+    if repository_error:
+        response["repository_error"] = repository_error
+    return response
 
 
 def _detect_control_ui_status() -> str:
@@ -935,16 +1124,27 @@ def ingest_event(event: dict = None, **kwargs) -> dict:
                             metadata={"backup_path": backup_path, "raw_memory_id": str(raw_id)},
                         )
 
+            # Determine searchable status:
+            # - For PROMOTED items: queued for async indexing to Weaviate (not immediately searchable)
+            # - For CAPTURED_RAW: only stored in PostgreSQL, searchable via fallback only
+            # The actual Weaviate sync happens asynchronously via sync_memory_item in the pipeline
+            is_promoted = bool(promoted_id)
             return {
                 "id": str(promoted_id or raw_id),
                 "raw_id": str(raw_id),
                 "promoted_id": str(promoted_id) if promoted_id else None,
-                "status": "PROMOTED" if promoted_id else "CAPTURED_RAW",
-                "memory_class": inferred["memory_class"] if promoted_id else "episodic",
-                "memory_type": inferred["memory_type"] if promoted_id else event_type,
+                "status": "PROMOTED" if is_promoted else "CAPTURED_RAW",
+                "memory_class": inferred["memory_class"] if is_promoted else "episodic",
+                "memory_type": inferred["memory_type"] if is_promoted else event_type,
                 "backup_path": backup_path,
-                "promoted_count": 1 if promoted_id else 0,
+                "promoted_count": 1 if is_promoted else 0,
                 "method": "memory_md_first_upsert",
+                # Searchable fields - content is NOT immediately searchable after ingestion
+                # because async sync to Weaviate happens separately via the pipeline
+                "searchable": False,
+                # Estimate in milliseconds for when content will become searchable in Weaviate
+                # This accounts for async pipeline processing time
+                "searchableAfterMs": 5000 if is_promoted else None,
             }
         finally:
             conn.close()

@@ -34,6 +34,29 @@ test("BrainClaw manifest exposes Lossless-Claw integration configuration", () =>
   }
 });
 
+test("BrainClaw manifest publishes runtime gate and CLI contract metadata", () => {
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, "openclaw.plugin.json"), "utf8"),
+  );
+  const contract = manifest.lcmContract ?? {};
+
+  assert.deepStrictEqual(contract.compatibilityStates, [
+    "not_installed",
+    "installed_compatible",
+    "installed_degraded",
+    "installed_incompatible",
+    "installed_unreachable",
+  ]);
+  assert.ok(
+    Array.isArray(contract.runtimeGateChecks) && contract.runtimeGateChecks.length >= 6,
+    "Expected runtime gate checks in manifest metadata",
+  );
+  assert.ok(
+    Array.isArray(contract.operationalCommands) && contract.operationalCommands.includes("brainclaw lcm status"),
+    "Expected CLI contract commands in manifest metadata",
+  );
+});
+
 test("BrainClaw registers Lossless-Claw integration service and CLI surfaces", () => {
   const registeredServices = [];
   const registeredCli = [];

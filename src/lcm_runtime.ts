@@ -79,6 +79,28 @@ function collectToolNamesFromInstallPath(installPath?: string): string[] {
   return [...toolNames];
 }
 
+function collectToolNamesFromRuntimeConfig(config: any): string[] {
+  const candidates = [
+    config?.plugins?.runtimeToolNames?.["lossless-claw"],
+    config?.plugins?.toolNames?.["lossless-claw"],
+    config?.plugins?.registry?.["lossless-claw"]?.toolNames,
+    config?.plugins?.entries?.["lossless-claw"]?.toolNames,
+  ];
+
+  const toolNames = new Set<string>();
+  for (const value of candidates) {
+    if (!Array.isArray(value)) {
+      continue;
+    }
+    for (const item of value) {
+      if (typeof item === "string" && item.trim()) {
+        toolNames.add(item.trim());
+      }
+    }
+  }
+  return [...toolNames];
+}
+
 export function resolveBrainclawPluginConfig(config: any): Record<string, any> {
   return (config?.plugins?.entries?.brainclaw?.config as Record<string, any>) ?? {};
 }
@@ -91,19 +113,29 @@ export function buildLosslessClawRuntimeSnapshot(params: {
   const pluginConfig = params.pluginConfig ?? resolveBrainclawPluginConfig(params.config);
   const installs = params.config?.plugins?.installs ?? {};
   const slots = params.config?.plugins?.slots ?? {};
+  const pluginEntry = params.config?.plugins?.entries?.["lossless-claw"];
+  const pluginRegistered = Boolean(pluginEntry);
   const losslessInstall = installs["lossless-claw"] as PluginInstallRecord | undefined;
   const installPath = pluginConfig.losslessClawPluginPath || losslessInstall?.installPath;
+  const runtimeToolNames = collectToolNamesFromRuntimeConfig(params.config);
+  const discoveredToolNames =
+    runtimeToolNames.length > 0
+      ? runtimeToolNames
+      : collectToolNamesFromInstallPath(installPath);
 
   return {
     openclaw_version: resolveOpenClawVersion(params.config, params.runtimeVersion),
     memory_slot: typeof slots.memory === "string" ? slots.memory : null,
     context_engine_slot: typeof slots.contextEngine === "string" ? slots.contextEngine : null,
     plugin_installed: Boolean(losslessInstall),
+    plugin_registered: pluginRegistered,
     plugin_enabled:
       pluginConfig.losslessClawEnabled !== false &&
-      (params.config?.plugins?.entries?.["lossless-claw"]?.enabled ?? true) !== false,
+      pluginRegistered &&
+      (pluginEntry?.enabled ?? true) !== false,
     plugin_version: losslessInstall?.version || null,
     plugin_install_path: installPath || null,
-    tool_names: collectToolNamesFromInstallPath(installPath),
+    tool_names: discoveredToolNames,
+    tool_source: runtimeToolNames.length > 0 ? "runtime_registry" : "install_path_scan",
   };
 }

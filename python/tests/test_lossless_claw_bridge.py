@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime
+import json
 import sqlite3
 from pathlib import Path
 
@@ -153,3 +155,149 @@ def test_lcm_rebuild_bridge_uses_canonical_repository_when_available(monkeypatch
     assert result["status"] == "completed"
     assert result["target"] == "neo4j"
     assert repo.rebuild_checkpoints["neo4j"]["status"] == "completed"
+
+
+def test_lcm_status_surfaces_checkpoint_backfill_and_rebuild_state(monkeypatch, tmp_path):
+    from openclaw_memory.bridge_entrypoints import lcm_status
+    from openclaw_memory.integration.lossless_sync import InMemoryLosslessRepository
+
+    db_path = tmp_path / "lossless.db"
+    _seed_minimal_lcm_db(db_path)
+
+    repo = InMemoryLosslessRepository(source_id="lossless-claw", source_type="context_engine")
+    repo.upsert_checkpoint(
+        {
+            "source_id": "lossless-claw",
+            "source_type": "context_engine",
+            "last_created_at": "2026-03-19T00:00:00Z",
+            "last_artifact_id": "sum-bridge",
+            "status": "completed",
+            "retry_count": 0,
+            "replay_marker": "2026-03-19T00:00:00Z::sum-bridge",
+        }
+    )
+    repo.mark_backfill("mem-1", "weaviate", status="pending")
+    repo.update_rebuild_checkpoint(
+        "neo4j",
+        {
+            "checkpoint_ref": "cp-neo4j-1",
+            "status": "completed",
+            "last_validated_at": "2026-03-19T00:05:00Z",
+            "last_validated_target_state": {"memory_item_count": 4},
+        },
+    )
+
+    monkeypatch.setattr(
+        "openclaw_memory.integration.lossless_sync.build_postgres_repository_from_env",
+        lambda *args, **kwargs: repo,
+    )
+
+    result = lcm_status(
+        runtime={
+            "openclaw_version": "2026.3.14",
+            "memory_slot": "brainclaw",
+            "context_engine_slot": "lossless-claw",
+            "plugin_enabled": True,
+            "plugin_installed": True,
+            "plugin_registered": True,
+            "plugin_version": "0.4.0",
+            "plugin_install_path": str(tmp_path),
+            "tool_names": ["lcm_grep", "lcm_describe", "lcm_expand_query"],
+        },
+        plugin_config={"dbPath": str(db_path)},
+    )
+
+    assert result["compatibility_state"] == "installed_compatible"
+    assert result["checkpoint_state"]["last_artifact_id"] == "sum-bridge"
+    assert result["backfill_required_state"]["pending"] == 1
+    assert result["rebuild_status"]["neo4j"]["status"] == "completed"
+    assert result["integration_state"]["compatibility_state"] == "installed_compatible"
+
+
+def test_lcm_status_handles_repository_state_query_failures_without_crashing(monkeypatch, tmp_path):
+    from openclaw_memory.bridge_entrypoints import lcm_status
+    from openclaw_memory.integration.lossless_sync import InMemoryLosslessRepository
+
+    db_path = tmp_path / "lossless.db"
+    _seed_minimal_lcm_db(db_path)
+
+    repo = InMemoryLosslessRepository(source_id="lossless-claw", source_type="context_engine")
+
+    def boom():
+        raise RuntimeError("missing table: derived_backfill_state")
+
+    repo.summarize_backfill_state = boom  # type: ignore[method-assign]
+
+    monkeypatch.setattr(
+        "openclaw_memory.integration.lossless_sync.build_postgres_repository_from_env",
+        lambda *args, **kwargs: repo,
+    )
+
+    result = lcm_status(
+        runtime={
+            "openclaw_version": "2026.3.14",
+            "memory_slot": "brainclaw",
+            "context_engine_slot": "lossless-claw",
+            "plugin_enabled": True,
+            "plugin_installed": True,
+            "plugin_registered": True,
+            "plugin_version": "0.4.0",
+            "plugin_install_path": str(tmp_path),
+            "tool_names": ["lcm_grep", "lcm_describe", "lcm_expand_query"],
+        },
+        plugin_config={"dbPath": str(db_path)},
+    )
+
+    assert result["compatibility_state"] == "installed_compatible"
+    assert result["integration_state"]["compatibility_state"] == "installed_compatible"
+    assert "repository_error" in result
+
+
+def test_lcm_status_returns_json_serializable_operational_state(monkeypatch, tmp_path):
+    from openclaw_memory.bridge_entrypoints import lcm_status
+    from openclaw_memory.integration.lossless_sync import InMemoryLosslessRepository
+
+    db_path = tmp_path / "lossless.db"
+    _seed_minimal_lcm_db(db_path)
+
+    class DateTimeRepo(InMemoryLosslessRepository):
+        def get_checkpoint(self):  # type: ignore[override]
+            return {"last_artifact_id": "sum-bridge", "updated_at": datetime.datetime(2026, 3, 19, 0, 0, 0)}
+
+        def get_integration_state(self):  # type: ignore[override]
+            return {
+                "compatibility_state": "installed_compatible",
+                "updated_at": datetime.datetime(2026, 3, 19, 0, 0, 0),
+            }
+
+        def get_rebuild_status(self):  # type: ignore[override]
+            return {
+                "neo4j": {
+                    "status": "completed",
+                    "last_validated_at": datetime.datetime(2026, 3, 19, 0, 0, 0),
+                }
+            }
+
+    repo = DateTimeRepo(source_id="lossless-claw", source_type="context_engine")
+
+    monkeypatch.setattr(
+        "openclaw_memory.integration.lossless_sync.build_postgres_repository_from_env",
+        lambda *args, **kwargs: repo,
+    )
+
+    result = lcm_status(
+        runtime={
+            "openclaw_version": "2026.3.14",
+            "memory_slot": "brainclaw",
+            "context_engine_slot": "lossless-claw",
+            "plugin_enabled": True,
+            "plugin_installed": True,
+            "plugin_registered": True,
+            "plugin_version": "0.4.0",
+            "plugin_install_path": str(tmp_path),
+            "tool_names": ["lcm_grep", "lcm_describe", "lcm_expand_query"],
+        },
+        plugin_config={"dbPath": str(db_path)},
+    )
+
+    json.dumps(result)

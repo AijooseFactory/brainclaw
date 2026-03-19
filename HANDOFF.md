@@ -1,9 +1,69 @@
 # BrainClaw PRD v3.0 Implementation Handoff
 
-> **Last updated:** 2026-03-19  
+> **Last updated:** 2026-03-19 (contract alignment + runtime validation pass)  
 > **Branch:** `codex/lossless-claw-integration`  
-> **Latest commit:** `9a2654a`  
 > **Container:** `ajf-openclaw` (volume-mounted at `/home/node/.openclaw/extensions/brainclaw`)
+
+---
+
+## 2026-03-19 Latest Continuation State
+
+### Contract alignment updates completed
+- README rewritten to match final PRD contract surface (runtime gate, canonical authority, thresholds, drill-down order, rollout safety, command contract).
+- `openclaw.plugin.json` extended with explicit `lcmContract` metadata:
+  - compatibility states
+  - runtime gate checks
+  - operational commands
+- `specs/001-authoritative-memory-backend/data-model.md` rewritten with final canonical table/field contracts:
+  - exact-once `artifact_hash` + composite key
+  - ACL/scope fields
+  - provenance payload
+  - reason codes
+  - candidate taxonomy + candidate->memory mapping
+  - deterministic replay rule
+
+### Runtime + CLI hardening completed
+- Runtime snapshot now includes plugin registration state and runtime-tool-source handling:
+  - `plugin_registered`
+  - stricter `plugin_enabled` gate requires registered plugin entry
+  - runtime tool names preferred when present; install-path scan fallback retained
+- `lcm status`, `lcm sync`, and `rebuild` surfaces now include operational state payloads:
+  - `integration_state`
+  - `checkpoint_state`
+  - `degraded_state_details`
+  - `replay_status`
+  - `backfill_required_state`
+  - `rebuild_status` / `rebuild_checkpoint`
+- Bridge error handling now parses JSON error payloads even on non-zero Python exits.
+- `lcm status` payload is now JSON-safe (datetime fields normalized to ISO strings).
+
+### Live runtime validation in `ajf-openclaw`
+- `docker ps` confirms `ajf-openclaw` healthy.
+- `brainclaw memory sync` succeeds.
+- `brainclaw lcm status` now succeeds in live runtime and reports:
+  - `compatibility_state: installed_compatible`
+  - checkpoint state
+  - replay status
+  - backfill-required summary
+  - rebuild checkpoint details
+
+### Test evidence from this pass
+- Node tests: `npm test` -> **35/35 passing**
+- Python contract/integration suite:
+  - `python/tests/test_lossless_claw_contract.py`
+  - `python/tests/test_lossless_claw_sync.py`
+  - `python/tests/test_lossless_claw_bridge.py`
+  - `python/tests/test_operational_memory_sync.py`
+  - `python/tests/test_memory_contract.py`
+  -> **43/43 passing**
+
+### Notes for next agent
+- This repository includes a pre-existing modified set in:
+  - `python/tests/test_brainclaw_core.py`
+  - `src/tools/ingest.ts`
+  - `tests/tools.test.js`
+  These were preserved and kept compatible with current passing Node/Python contract suites.
+- Some async tests in `python/tests/test_brainclaw_core.py` require async pytest plugin wiring; they are outside the LCM contract pass scope.
 
 ---
 

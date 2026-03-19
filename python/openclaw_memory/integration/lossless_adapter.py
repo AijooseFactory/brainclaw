@@ -79,6 +79,7 @@ class OpenClawRuntimeSnapshot:
     plugin_version: Optional[str]
     plugin_install_path: Optional[str]
     tool_names: list[str] = field(default_factory=list)
+    plugin_registered: bool = True
 
     @classmethod
     def from_dict(cls, payload: Optional[dict[str, Any]]) -> "OpenClawRuntimeSnapshot":
@@ -89,6 +90,11 @@ class OpenClawRuntimeSnapshot:
             context_engine_slot=data.get("context_engine_slot"),
             plugin_enabled=bool(data.get("plugin_enabled")),
             plugin_installed=bool(data.get("plugin_installed")),
+            plugin_registered=bool(
+                data.get("plugin_registered")
+                if data.get("plugin_registered") is not None
+                else data.get("plugin_installed")
+            ),
             plugin_version=data.get("plugin_version"),
             plugin_install_path=data.get("plugin_install_path"),
             tool_names=list(data.get("tool_names") or []),
@@ -363,6 +369,18 @@ class LosslessClawAdapter:
             return LosslessClawDetectionReport(
                 compatibility_state=CompatibilityState.INSTALLED_DEGRADED,
                 reason_code=ReasonCode.PLUGIN_DISABLED.value,
+                db_path=self.resolve_db_path(),
+                schema_fingerprint=None,
+                supported_profile=None,
+                tool_availability=tool_availability,
+                openclaw_version=self.runtime.openclaw_version,
+                plugin_version=self.runtime.plugin_version,
+            )
+
+        if not self.runtime.plugin_registered:
+            return LosslessClawDetectionReport(
+                compatibility_state=CompatibilityState.INSTALLED_INCOMPATIBLE,
+                reason_code=ReasonCode.SLOT_UNRESOLVED.value,
                 db_path=self.resolve_db_path(),
                 schema_fingerprint=None,
                 supported_profile=None,

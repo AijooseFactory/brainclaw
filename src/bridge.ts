@@ -252,9 +252,24 @@ except Exception as e:
       const duration = Date.now() - startTime;
       
       if (code !== 0) {
-        const errorMsg = `Python process exited with code ${code}. Stderr: ${stderr}`;
+        let parsedError: string | undefined;
+        try {
+          const parsedResult = parseBackendJsonOutput(stdout);
+          if (parsedResult?.error) {
+            parsedError = String(parsedResult.error);
+          }
+        } catch {
+          // Fall through to generic exit error message.
+        }
+        const errorMsg = parsedError
+          ? `Python backend error: ${parsedError}`
+          : `Python process exited with code ${code}. Stderr: ${stderr}`;
         const error = new Error(sanitizeError(errorMsg));
-        const classified = logger.error('bridge', 'pythonExit', error, { module, funct, exitCode: code });
+        const classified = logger.error('bridge', parsedError ? 'pythonError' : 'pythonExit', error, {
+          module,
+          funct,
+          exitCode: code,
+        });
         logger.timing('bridge', 'callPythonBackend', duration, { module, funct, result: 'error', category: classified.category });
         reject(error);
       } else {

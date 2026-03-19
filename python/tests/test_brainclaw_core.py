@@ -28,6 +28,7 @@ from openclaw_memory.security.access_control import (
     get_current_agent_id,
     get_current_team_id,
     get_current_tenant_id,
+    get_current_agent_db_id,
     set_db_session_context,
 )
 
@@ -203,7 +204,7 @@ class TestMemoryClasses:
     """Memory class constants and validation."""
 
     def test_expected_classes_exist(self):
-        expected = {"short_term", "working", "long_term", "episodic", "semantic"}
+        expected = {"episodic", "semantic", "procedural", "decision", "identity", "relational", "summary"}
         actual = {c.value if hasattr(c, "value") else c for c in MemoryClass}
         assert expected.issubset(actual), f"Missing memory classes: {expected - actual}"
 
@@ -229,8 +230,9 @@ class TestSetDbSessionContext:
         # Disable team verification to isolate this test
         await set_db_session_context(mock_conn, verify_team=False)
 
+        expected_agent_id = get_current_agent_db_id()
         executed_sql = [call.args[0] for call in mock_conn.execute.call_args_list]
-        assert any("agent-rls-test" in sql for sql in executed_sql)
+        assert any(expected_agent_id in sql for sql in executed_sql)
 
     @pytest.mark.asyncio
     async def test_team_id_denied_when_not_member(self):
@@ -243,7 +245,7 @@ class TestSetDbSessionContext:
         async def fake_team_lookup(agent_id, team_id, **_):
             return False  # Not a member
 
-        with patch("openclaw_memory.security.access_control.is_agent_in_team", fake_team_lookup):
+        with patch("openclaw_memory.security.team_lookup.is_agent_in_team", fake_team_lookup):
             await set_db_session_context(mock_conn, verify_team=True)
 
         executed_sql = [call.args[0] for call in mock_conn.execute.call_args_list]

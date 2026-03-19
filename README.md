@@ -1,110 +1,158 @@
-# BrainClaw Plugin v1.3.0
+# BrainClaw Plugin (OpenClaw Memory Slot)
 
-BrainClaw is a Hardened Hybrid GraphRAG Plugin for OpenClaw with Multi-Agent Isolation. It serves as its memory and knowledge system. It enables OpenClaw agents to retain, learn from, and retrieve context across conversations and sessions, with enterprise-grade observability, automatic summarization, and active learning capabilities.
+BrainClaw is the canonical durable memory plugin for OpenClaw.
 
-## Features
+- Canonical ledger: **PostgreSQL**
+- Derived stores: **Weaviate** (retrieval), **Neo4j** (graph)
+- Lossless-Claw role: **upstream context source only** (never canonical truth)
 
-- **Multi-store Retrieval**: PostgreSQL (canonical), Weaviate (vector), Neo4j (graph)
-- **Multi-Agent Isolation**: HMAC-SHA256 identity tokens & PostgreSQL RLS
-- **Community Detection**: Leiden algorithm for hierarchical clustering
-- **Audit Ledger**: Immutable audit trail for compliance
-- **Structured Logging**: Error categorization for self-improvement
+This repository implements BrainClaw + Lossless-Claw integration **without changing Lossless-Claw code or schema**.
 
-## Installation
+## Compatibility Matrix
 
-### 1. Install Dependencies & Build
+### Runtime floor currently enforced in code
+- OpenClaw: `2026.3.14+`
+- Lossless-Claw: `0.4.0`
 
-BrainClaw requires both Node.js (for the Gateway plugin) and Python (for the RAG backend).
+### Historical PRD baseline
+- OpenClaw `2026.3.13` / tag `v2026.3.13-1` is retained as a documented baseline reference.
+
+Unknown OpenClaw versions and unknown Lossless-Claw schema fingerprints do not silently enable import.
+
+## Runtime Gate Contract
+
+BrainClaw enables Lossless-Claw integration only when all required checks pass:
+
+1. OpenClaw version is supported.
+2. `plugins.slots.memory=brainclaw`.
+3. `plugins.slots.contextEngine=lossless-claw`.
+4. Lossless-Claw install is present in `plugins.installs`.
+5. Lossless-Claw is registered/enabled in plugin runtime entries.
+6. Required Lossless-Claw tools are available at runtime (or from supported fallback discovery).
+
+Supported compatibility states are:
+- `not_installed`
+- `installed_compatible`
+- `installed_degraded`
+- `installed_incompatible`
+- `installed_unreachable`
+
+BrainClaw persists integration state in canonical storage (`integration_states`) with:
+- current state
+- reason code
+- last successful gate timestamp
+- last degraded reason/timestamp
+- last successful supported profile
+
+## Canonical Data Flow
+
+Authority flow:
+
+1. Import Lossless-Claw artifacts into `source_artifacts`.
+2. Validate + scope-check + trust-check (fail closed).
+3. Extract staged `memory_candidates`.
+4. Run contradiction and promotion policy.
+5. Write promoted `memory_items` to PostgreSQL.
+6. Mark derived-store backfill for Weaviate/Neo4j.
+
+Exact-once dedupe is enforced by:
+- deterministic `artifact_hash`
+- unique composite key: source plugin + scope key + artifact type + artifact id + source timestamp + hash
+
+Repair/replay is deterministic and does not duplicate already-promoted memory from already-imported artifacts.
+
+## Promotion Policy
+
+Promotion thresholds are explicit:
+
+- auto-promote when `raw_extraction_confidence >= 0.85`
+- or promote when `interpretive_confidence >= 0.70` **and** `topic_hint_match_score >= 0.60`
+- otherwise block as `LOW_CONFIDENCE` unless stronger corroboration or privileged override applies
+
+Interpretive candidates never bypass policy.
+
+## Drill-Down Contract
+
+BrainClaw retrieval is memory-first. Lossless-Claw drill-down is supplemental evidence only.
+
+Drill-down order:
+1. `lcm_expand_query` (if available and allowed)
+2. `lcm_expand` (if available and allowed)
+3. Direct SQLite DAG traversal (supported fingerprints only)
+4. Canonical-only response with degraded state surfaced
+
+## ACL / Scope Contract
+
+BrainClaw persists ACL/scope fields on source artifacts, candidates, and promoted memory:
+
+- `workspace_id`
+- `agent_id`
+- `session_id`
+- `project_id`
+- `user_id`
+- `visibility_scope`
+- `owner_id`
+- `statefulness`
+- `access_control`
+
+Default write policy is owner-only unless explicitly authorized.
+
+## Operational Commands
 
 ```bash
-# Install Node dependencies and build the plugin
-npm install
-npm run build
-
-# Install Python backend dependencies
-pip install -r requirements.txt
+brainclaw lcm status
+brainclaw lcm sync --mode bootstrap
+brainclaw lcm sync --mode incremental
+brainclaw lcm sync --mode repair
+brainclaw rebuild --target weaviate
+brainclaw rebuild --target neo4j
+brainclaw memory sync
 ```
 
-### 2. Configure Plugin
+`brainclaw lcm status` returns compatibility state, reason code, checkpoint state, replay state, backfill summary, and rebuild checkpoint status.
 
-Add to your `openclaw.json`:
+## Configuration Surface
 
-```json
-{
-  "plugins": {
-    "entries": {
-      "brainclaw": {
-        "enabled": true,
-        "postgresUrl": "${POSTGRES_URL}",
-        "weaviateUrl": "${WEAVIATE_URL}",
-        "neo4jUrl": "${NEO4J_URL}",
-        "neo4jUser": "neo4j",
-        "neo4jPassword": "${NEO4J_PASSWORD}",
-        "pythonBackendPath": "/path/to/openclaw-memory/src"
-      }
-    }
-  }
-}
-```
+Lossless-Claw integration config keys (BrainClaw-owned):
 
-### 3. Bundle Python Backend (Production)
+- `losslessClawEnabled`
+- `losslessClawPluginPath`
+- `losslessClawDbPath`
+- `losslessClawBootstrapOnStart`
+- `losslessClawPollIntervalMs`
+- `losslessClawDrillDownEnabled`
+- `losslessClawArtifactQuotaBytes`
+- `losslessClawAnchorByteCap`
+- `losslessClawLargeFileMode`
+- `losslessClawTrustMode`
 
-For production deployment, bundle the Python backend into the plugin:
+See [`openclaw.plugin.json`](/Users/george/Mac/data/usr/projects/ai_joose_factory/.a0proj/ajf-openclaw/brainclaw-sync/openclaw.plugin.json) for schema defaults and enums.
 
-```bash
-npm run bundle
-# or
-./scripts/bundle-python.sh
-```
+## Rollout Safety (ajf-openclaw and generic OpenClaw installs)
 
-This creates `python/openclaw_memory/` with the bundled backend.
+Required production safety rules:
 
-## Configuration
+- Never roll production against floating local OpenClaw HEAD.
+- Never recreate production with an empty `./data` mount.
+- Never run destructive volume commands (`docker compose down -v`).
+- Never hand-edit `data/openclaw.json` or `plugins.installs`.
+- Always take a pre-change snapshot of the OpenClaw state directory.
+- Validate staging on the same version/config/state shape before production promotion.
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `postgresUrl` | Yes | - | PostgreSQL connection URL |
-| `weaviateUrl` | Yes | - | Weaviate connection URL |
-| `neo4jUrl` | Yes | - | Neo4j connection URL |
-| `neo4jUser` | No | `neo4j` | Neo4j username |
-| `neo4jPassword` | No | - | Neo4j password |
-| `pythonPath` | No | `python3` | Python executable path |
-| `pythonBackendPath` | No | bundled | Path to openclaw-memory package |
-| `pythonTimeoutMs` | No | `30000` | Timeout for Python calls (ms) |
-| `embeddingModel` | No | - | Embedding model name |
-| `extractionModel` | No | - | Extraction model name |
-| `enableAuditLedger` | No | `true` | Enable audit ledger |
-| `enableCommunityDetection` | No | `true` | Enable community detection |
+Restart/rebuild acceptance expectations:
 
-## Path Resolution
-
-The plugin resolves Python backend paths in this order:
-
-1. `config.pythonBackendPath` (highest priority)
-2. `process.env.OPENCLAW_PYTHON_BACKEND`
-3. Bundled: `python/openclaw_memory/`
-4. Development: `packages/openclaw-memory/src/`
-
-## Security
-
-- **Tenant Isolation**: URL allowlist prevents data exfiltration
-- **Code Injection Prevention**: Module/function routing allowlist
-- **Credential Protection**: Sensitive fields marked, plaintext warnings
-- **Error Sanitization**: User paths stripped from error messages
+- Preserve `plugins.slots.memory=brainclaw`.
+- Preserve `plugins.slots.contextEngine=lossless-claw`.
+- Preserve `plugins.installs` and plugin-enabled state.
+- Preserve Control UI config, auth, agents, sessions, workspaces, and canonical BrainClaw state.
 
 ## Development
 
 ```bash
-# Build
+npm install
 npm run build
-
-# Test
 npm test
 
-# Bundle Python
-npm run bundle
+pip install -r requirements.txt
+PYTHONPATH=python pytest -q
 ```
-
-## License
-
-MIT

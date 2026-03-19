@@ -49,7 +49,32 @@
       }
     },
     "description": "All fields are optional at install time. Configure via Control UI after install, or use ${ENV_VAR} substitution."
-
+  },
+  "lcmContract": {
+    "compatibilityStates": [
+      "not_installed",
+      "installed_compatible",
+      "installed_degraded",
+      "installed_incompatible",
+      "installed_unreachable"
+    ],
+    "runtimeGateChecks": [
+      "openclaw_version_supported",
+      "plugins.slots.memory=brainclaw",
+      "plugins.slots.contextEngine=lossless-claw",
+      "plugins.installs.lossless-claw_present",
+      "plugins.entries.lossless-claw_registered_and_enabled",
+      "runtime_tool_names_available"
+    ],
+    "operationalCommands": [
+      "brainclaw lcm status",
+      "brainclaw lcm sync --mode bootstrap",
+      "brainclaw lcm sync --mode incremental",
+      "brainclaw lcm sync --mode repair",
+      "brainclaw rebuild --target weaviate",
+      "brainclaw rebuild --target neo4j",
+      "brainclaw memory sync"
+    ]
   },
   "skills": ["./skills"]
 }

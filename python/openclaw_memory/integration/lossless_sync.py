@@ -384,6 +384,8 @@ class CanonicalLosslessRepository(Protocol):
 
     def get_checkpoint(self) -> dict[str, Any] | None: ...
 
+    def get_integration_state(self) -> dict[str, Any] | None: ...
+
     def upsert_checkpoint(self, checkpoint: dict[str, Any]) -> None: ...
 
     def upsert_source_artifact(self, artifact: dict[str, Any]) -> tuple[str, bool]: ...
@@ -401,6 +403,10 @@ class CanonicalLosslessRepository(Protocol):
     def record_dead_letter(self, artifact: dict[str, Any]) -> None: ...
 
     def update_rebuild_checkpoint(self, target: str, payload: dict[str, Any]) -> None: ...
+
+    def summarize_backfill_state(self) -> dict[str, int]: ...
+
+    def get_rebuild_status(self) -> dict[str, dict[str, Any]]: ...
 
 
 class InMemoryLosslessRepository:
@@ -439,6 +445,9 @@ class InMemoryLosslessRepository:
 
     def get_checkpoint(self) -> dict[str, Any] | None:
         return dict(self.checkpoint) if self.checkpoint else None
+
+    def get_integration_state(self) -> dict[str, Any] | None:
+        return dict(self.integration_state) if self.integration_state else None
 
     def upsert_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         self.checkpoint = dict(checkpoint)
@@ -537,6 +546,17 @@ class InMemoryLosslessRepository:
             "target": target,
             **dict(payload),
         }
+
+    def summarize_backfill_state(self) -> dict[str, int]:
+        counts = {"pending": 0, "failed": 0, "completed": 0}
+        for state in self.derived_backfill_state.values():
+            status = str(state.get("status") or "pending")
+            if status in counts:
+                counts[status] += 1
+        return counts
+
+    def get_rebuild_status(self) -> dict[str, dict[str, Any]]:
+        return {target: dict(payload) for target, payload in self.rebuild_checkpoints.items()}
 
 
 class LosslessClawSyncEngine:
@@ -1037,6 +1057,30 @@ class PostgresLosslessRepository:
                 row = cur.fetchone()
                 return dict(row) if row else None
 
+    def get_integration_state(self) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            with conn.cursor(cursor_factory=self._psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        source_id,
+                        source_type,
+                        compatibility_state,
+                        reason_code,
+                        last_successful_gate_evaluated_at,
+                        last_degraded_reason_code,
+                        last_degraded_transition_at,
+                        last_successful_supported_profile,
+                        metadata,
+                        updated_at
+                    FROM integration_states
+                    WHERE source_id = %s AND source_type = %s
+                    """,
+                    (self.source_id, self.source_type),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+
     def upsert_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         with self._connect() as conn:
             with conn.cursor() as cur:
@@ -1449,6 +1493,46 @@ class PostgresLosslessRepository:
                         _utcnow(),
                     ),
                 )
+
+    def summarize_backfill_state(self) -> dict[str, int]:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT status, COUNT(*)::INTEGER
+                    FROM derived_backfill_state
+                    GROUP BY status
+                    """
+                )
+                counts = {"pending": 0, "failed": 0, "completed": 0}
+                for status, count in cur.fetchall():
+                    normalized = str(status or "pending")
+                    if normalized in counts:
+                        counts[normalized] = int(count)
+                return counts
+
+    def get_rebuild_status(self) -> dict[str, dict[str, Any]]:
+        with self._connect() as conn:
+            with conn.cursor(cursor_factory=self._psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        target,
+                        checkpoint_ref,
+                        last_validated_at,
+                        last_validated_target_state,
+                        status,
+                        updated_at
+                    FROM rebuild_checkpoints
+                    """
+                )
+                rows = cur.fetchall()
+                result: dict[str, dict[str, Any]] = {}
+                for row in rows:
+                    payload = dict(row)
+                    target = str(payload.pop("target"))
+                    result[target] = payload
+                return result
 
 
 def build_postgres_repository_from_env(

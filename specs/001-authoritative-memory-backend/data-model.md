@@ -1,168 +1,155 @@
-# Data Model: Authoritative OpenClaw Memory Backend
+# Data Model: BrainClaw Canonical Ledger + Lossless-Claw Integration
 
-## Canonical Store
+## Canonical Authority
 
-### PostgreSQL
+PostgreSQL is canonical for all durable memory truth.
 
-PostgreSQL is the authoritative ledger for:
+- Weaviate and Neo4j are derived and rebuildable from PostgreSQL.
+- Lossless-Claw artifacts are ingested as source evidence, never canonical truth.
 
-- raw events and messages
-- promoted memory items
-- decision records
-- provenance and extraction metadata
-- lifecycle and supersession state
-- visibility, tenancy, and access metadata
-- retrieval and promotion audit logs
+## Canonical Integration Tables
 
-Weaviate and Neo4j are derived from PostgreSQL-backed history and must be
-rebuildable.
+BrainClaw canonical records for Lossless-Claw integration must include:
 
-## Core Entities
+- `source_artifacts`
+- `memory_candidates`
+- `source_sync_checkpoints`
+- `integration_states`
+- `promotion_overrides`
+- `dead_letter_artifacts`
+- `rebuild_checkpoints`
+- `derived_backfill_state`
 
-### Raw Event
+## Exact-Once and Replay Contract
 
-- `event_id`
+Each imported source artifact must store:
+
+- `artifact_hash` (deterministic content hash)
+
+And must be deduplicated by a composite unique key on:
+
+- `source_plugin`
+- `source_scope_key`
+- `source_artifact_type`
+- `source_artifact_id`
+- `source_created_at`
+- `artifact_hash`
+
+Checkpoint watermarks (`source_id`, `last_created_at`, `last_artifact_id`) are for scan efficiency only.  
+Replay correctness depends on hash + unique key.
+
+## ACL / Scope Contract
+
+Persist these fields as first-class canonical columns on:
+
+- `source_artifacts`
+- `memory_candidates`
+- `memory_items`
+- `promotion_overrides`
+
+Required fields:
+
+- `workspace_id`
+- `agent_id`
 - `session_id`
-- `message_id`
-- `agent_id`
-- `tenant_id`
-- `content`
-- `metadata`
-- `created_at`
-
-Purpose: lossless canonical capture of conversations, tool runs, and other
-session events.
-
-### Memory Item
-
-- `memory_id`
-- `memory_class`
-- `content`
-- `summary`
-- `confidence`
+- `project_id`
+- `user_id`
 - `visibility_scope`
-- `lifecycle_state`
-- `user_confirmed`
-- `promotion_status`
-- `created_at`
-- `updated_at`
+- `owner_id`
+- `statefulness`
+- `access_control`
 
-Purpose: durable memory record representing promoted knowledge, with links back
-to canonical raw history and retrieval/audit metadata.
+Default write policy is owner-only unless explicitly authorized.
 
-### Decision Record
+## Candidate Taxonomy
 
-- `decision_id`
-- `decision_summary`
-- `rationale`
-- `alternatives_considered`
-- `current_status`
-- `topic`
-- `effective_at`
-- `superseded_by`
-- `supersession_reason`
-- `evidence_refs`
+Required candidate types:
 
-Purpose: durable representation of what was decided, why, what changed, and
-what is active now.
+- `EntityCandidate`
+- `RelationshipCandidate`
+- `DecisionCandidate`
+- `ProcedureCandidate`
+- `PreferenceCandidate`
+- `IssueCandidate`
+- `EventCandidate`
+- `ConstraintCandidate`
 
-### Provenance Bundle
+## Candidate -> Memory Mapping
 
+- `EntityCandidate` -> identity + semantic
+- `RelationshipCandidate` -> relational + semantic
+- `DecisionCandidate` -> decision + episodic
+- `ProcedureCandidate` -> procedural + semantic
+- `PreferenceCandidate` -> semantic (soft)
+- `IssueCandidate` -> episodic + semantic
+- `EventCandidate` -> episodic
+- `ConstraintCandidate` -> semantic + policy/governance
+
+## Promotion Threshold Contract
+
+Use explicit PRD thresholds:
+
+- auto-promote when `raw_extraction_confidence >= 0.85`
+- interpretive promote when `interpretive_confidence >= 0.70` AND `topic_hint_match_score >= 0.60`
+
+Otherwise block as low-confidence unless stronger corroboration or privileged override applies.
+
+## Provenance Payload Contract
+
+Every LCM-derived promoted memory must preserve:
+
+- `source_artifact_ref`
+- `source_summary_id`
 - `source_session_id`
-- `source_message_id`
-- `extraction_timestamp`
-- `extractor_name`
+- `original_message_ids`
+- `import_timestamp`
 - `extractor_version`
-- `confidence`
-- `memory_class`
-- `visibility_scope`
+- `raw_extraction_confidence`
+- `interpretive_confidence`
+- `topic_hint_match_score`
+- `topic_hints`
+- `derivation_path`
+- `interpretation_flag` (`EXTRACTIVE` | `INTERPRETIVE`)
 - `user_confirmation_state`
+- `supersession_id`
+- `verification_result`
+- signer/plugin/runtime trust fields when available
 
-Purpose: trace any durable memory or answer back to source material and trust
-signals.
+## Integration State Contract
 
-### Promotion Policy State
+`integration_states` must persist:
 
-- `confidence_score`
-- `contradiction_state`
-- `repeat_count`
-- `evidence_count`
-- `explicit_remember`
-- `promotion_block_reason`
-- `review_required`
+- `compatibility_state`
+- `reason_code`
+- `last_successful_gate_evaluated_at`
+- `last_degraded_reason_code`
+- `last_degraded_transition_at`
+- `last_successful_supported_profile`
 
-Purpose: determine whether raw history becomes durable memory while preserving
-why a promotion was allowed or blocked.
+Allowed compatibility state values:
 
-### Supersession Link
+- `not_installed`
+- `installed_compatible`
+- `installed_degraded`
+- `installed_incompatible`
+- `installed_unreachable`
 
-- `from_memory_id`
-- `to_memory_id`
-- `reason`
-- `effective_at`
-- `evidence_refs`
+## Reason Code Contract
 
-Purpose: preserve temporal explanation of what changed and why without
-overwriting prior records.
+Enumerated reason codes for degraded state, dead-letter, and blocked promotion:
 
-### Retrieval Log
+- `SCHEMA_FINGERPRINT_UNKNOWN`
+- `SCOPE_AMBIGUOUS`
+- `STATELESS_SESSION`
+- `TOOL_UNAVAILABLE`
+- `ACL_DENIED`
+- `LOW_CONFIDENCE`
+- `CONTRADICTED`
+- `SOURCE_UNREACHABLE`
 
-- `retrieval_id`
-- `query`
-- `intent`
-- `retrieval_plan`
-- `result_refs`
-- `agent_id`
-- `tenant_id`
-- `created_at`
+## Rollback / Failure Semantics
 
-Purpose: audit why information was returned and support continuous improvement
-of routing and promotion.
-
-## Memory Classes
-
-BrainClaw must support at least these first-class memory classes:
-
-- episodic
-- semantic
-- procedural
-- relational
-- decision
-- identity_governance
-
-## Derived Index Responsibilities
-
-### Weaviate
-
-Derived semantic/hybrid index for:
-
-- chunks
-- summaries
-- concepts
-- decisions
-- tasks
-- procedures
-- preference-oriented memory
-
-### Neo4j
-
-Derived graph index for:
-
-- entities
-- concepts
-- decisions
-- tasks
-- dependencies
-- contradiction/support edges
-- supersession chains
-- temporal relations
-
-## Lifecycle States
-
-Memory records and decisions must support:
-
-- `created`
-- `active`
-- `superseded`
-- `expired`
-- `archived`
+- PostgreSQL failure aborts canonical durable writes.
+- Weaviate/Neo4j failure preserves canonical write and marks derived backfill required.
+- Repeated import failures are quarantined in `dead_letter_artifacts`.
+- Repair/replay is deterministic and must not duplicate already-promoted memory.

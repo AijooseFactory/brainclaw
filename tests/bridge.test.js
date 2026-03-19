@@ -85,6 +85,33 @@ test("Bridge Sanitization: Error message stripping", async () => {
   }
 });
 
+test("Bridge Error Handling: parses JSON error payloads from non-zero Python exits", async () => {
+  setSpawn(() => ({
+    stdout: {
+      on(event, cb) {
+        if (event === "data") {
+          cb(Buffer.from(JSON.stringify({ error: "relation integration_states does not exist" })));
+        }
+      },
+    },
+    stderr: { on: () => {} },
+    on(event, cb) {
+      if (event === "close") cb(1);
+    },
+    kill() {},
+  }));
+
+  try {
+    await callPythonBackend("bridge_entrypoints", "lcm_status", {}, baseBridgeConfig);
+    assert.fail("Should have surfaced JSON error payload from Python");
+  } catch (e) {
+    assert.ok(
+      e.message.includes("integration_states"),
+      "Expected parsed Python error message from stdout JSON payload",
+    );
+  }
+});
+
 test("Bridge Parsing: accepts trailing JSON after backend log noise", async () => {
   setSpawn(() => ({
     stdout: {
@@ -265,4 +292,27 @@ test("LCM Runtime: falls back when runtime version is unavailable or unknown", (
   });
 
   assert.strictEqual(runtime.openclaw_version, "2026.3.14");
+});
+
+test("LCM Runtime: marks install as unregistered when plugin entry is missing", () => {
+  const runtime = buildLosslessClawRuntimeSnapshot({
+    config: {
+      plugins: {
+        slots: { memory: "brainclaw", contextEngine: "lossless-claw" },
+        installs: {
+          "lossless-claw": {
+            installPath: "/tmp/lossless-claw-sync",
+            version: "0.4.0",
+          },
+        },
+        entries: {},
+      },
+    },
+    pluginConfig: {},
+    runtimeVersion: "2026.3.14",
+  });
+
+  assert.strictEqual(runtime.plugin_installed, true);
+  assert.strictEqual(runtime.plugin_registered, false);
+  assert.strictEqual(runtime.plugin_enabled, false);
 });

@@ -82,6 +82,36 @@ test("Ingest Tool: Parameter passing and execution (MOCKED)", async () => {
   }
 });
 
+test("Ingest Tool: Returns searchable field from backend (MOCKED)", async () => {
+  // Test with searchable: false and searchableAfterMs from Python backend
+  const mockResult = { 
+    id: "evt_456", 
+    status: "PROMOTED",
+    searchable: false,
+    searchableAfterMs: 5000
+  };
+  mockBridgeResponse(mockResult);
+
+  try {
+    const params = {
+      content: "Important decision to remember.",
+      memory_class: "decision",
+      tenant_id: "test"
+    };
+    const result = await ingestTool.execute("test_id", params, mockCtx);
+    
+    // Should include searchable note in text output
+    assert.ok(result.content[0].text.includes("~5000ms") || result.content[0].text.includes("not yet searchable"), 
+      "Should mention searchable timing in output");
+    
+    // Should include _meta with searchable fields for programmatic access
+    assert.equal(result._meta.searchable, false, "Should expose searchable from backend");
+    assert.equal(result._meta.searchableAfterMs, 5000, "Should expose searchableAfterMs from backend");
+  } finally {
+    // cleanup
+  }
+});
+
 test("Graph Health Tool: Execution", async () => {
   mockBridgeResponse({ status: "HEALTHY" });
   const result = await graphHealthTool.execute("test_id", { tenant_id: "test" }, mockCtx);

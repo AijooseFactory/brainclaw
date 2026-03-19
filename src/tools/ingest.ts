@@ -31,13 +31,34 @@ export const ingestTool = {
         event: event
       }, config, ctx);
 
+      // Extract searchable status from backend response
+      // Default to true for backward compatibility if field not present
+      const searchable = result.searchable !== undefined ? result.searchable : true;
+      const searchableAfterMs = result.searchableAfterMs;
+
+      // Build detailed response with searchable information
+      const statusText = result.status || "SAVED";
+      const searchableNote = searchable 
+        ? "" 
+        : searchableAfterMs 
+          ? ` (searchable in ~${searchableAfterMs}ms)` 
+          : " (not yet searchable)";
+
       return {
         content: [
           {
             type: "text",
-            text: `Ingestion successful. ID: ${result.id || "N/A"}, Status: ${result.status || "SAVED"}`
+            text: `Ingestion successful. ID: ${result.id || "N/A"}, Status: ${statusText}${searchableNote}`
           }
-        ]
+        ],
+        // Include raw result for programmatic access (backward compatible)
+        _meta: {
+          id: result.id,
+          status: result.status,
+          searchable: searchable,
+          searchableAfterMs: searchableAfterMs,
+          raw: result
+        }
       };
     } catch (error: any) {
       return {
