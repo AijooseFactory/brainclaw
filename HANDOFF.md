@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-19
 > Repo branch: `main`
-> Verify exact SHA live with: `git rev-parse HEAD`
+> Latest commit: `92e7cc0`
 > Live OpenClaw mount: `./brainclaw-sync -> /home/node/.openclaw/extensions/brainclaw`
 
 ## Read This First
@@ -33,6 +33,10 @@ If a report mixes those values together, the report is wrong.
 
 Current `main` history relevant to continuation work:
 
+- `92e7cc0` `feat: fold in-progress Control UI and Gateway overrides for BrainClaw`
+- `2930d55` `feat: bidirectional MEMORY.md ↔ DB sync with file watcher`
+- `627d999` `docs: refine memory data engineer skill description`
+- `1e8bfec` `docs: note memory-data-engineer skill in handoff`
 - `c6a30e6` `feat: rename lore skill to memory-data-engineer`
 - `c0e388b` `docs: clarify hybrid graphrag memory wording`
 - `9339e2d` `docs: align handoff commit references`
@@ -81,6 +85,21 @@ The BrainClaw TypeScript source is under `src/` and currently includes:
   - `memory_file_watcher`
 
 These are actually present in the repo. Do not claim they are missing without checking the BrainClaw repo path above.
+
+### Core UI & Gateway Overrides
+
+BrainClaw carries 20 in-progress UI/Gateway overrides in the `core-ui-overrides/` directory. These enable the BrainClaw Memory tab and optimized MEMORY.md view in the OpenClaw Control UI.
+
+- **Gateway Overrides** (`core-ui-overrides/src/gateway/`):
+  - `brainclaw-memory.ts` (New): Backing RPC for BrainClaw memory operations.
+  - `control-ui.ts`: Logic to auto-recover UI assets on demand.
+  - `server-methods/agents.ts`: Wired `agents.memory.list/update` methods.
+- **UI Overrides** (`core-ui-overrides/ui/src/ui/`):
+  - `controllers/agent-memory.ts` (New): Data management for the Memory tab.
+  - `views/agents-panels-status-files.ts`: Optimized MEMORY.md file list removal.
+  - `views/agents.ts`: Tab navigation registration for `Memory`.
+
+These are currently localized within the plugin repo to ensure full-stack sync. In production, they are intended to be applied as a sync-overlay to the OpenClaw core `/app` directory.
 
 ### Bidirectional Sync Architecture (MEMORY.md ↔ DB)
 
