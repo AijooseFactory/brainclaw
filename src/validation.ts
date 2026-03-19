@@ -5,6 +5,22 @@
 import { getLogger } from './logging.js';
 
 const ALLOWED_HOSTS = process.env.ALLOWED_DB_HOSTS?.split(',') || ['localhost', '127.0.0.1'];
+const ENV_BACKED_SECRET_KEYS: Record<string, string> = {
+  postgresUrl: 'POSTGRES_URL',
+  neo4jPassword: 'NEO4J_PASSWORD',
+};
+
+function looksLikeEnvReference(value: string): boolean {
+  return value.startsWith('${') && value.endsWith('}');
+}
+
+function matchesResolvedEnvValue(key: string, value: string): boolean {
+  const envVarName = ENV_BACKED_SECRET_KEYS[key];
+  if (!envVarName) return false;
+
+  const envValue = process.env[envVarName];
+  return Boolean(envValue) && envValue === value;
+}
 
 /**
  * Validates a tenant URL against a host allowlist to prevent data exfiltration.
@@ -29,9 +45,12 @@ export function validateTenantUrl(url: string | undefined): boolean {
  */
 export function warnIfPlaintextSecret(key: string, value: any): void {
   if (typeof value !== 'string') return;
-  
-  // If the value doesn't look like an env var reference and is not empty
-  if (value && !value.startsWith('${') && !value.endsWith('}')) {
+
+  if (!value || looksLikeEnvReference(value) || matchesResolvedEnvValue(key, value)) {
+    return;
+  }
+
+  if (value) {
     getLogger().security('validation', 'plaintextSecret', 
       `Configuration field "${key}" appears to contain a plaintext secret`,
       { key, hint: 'Use environment variable references (e.g., ${VAR_NAME})' });
