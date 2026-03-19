@@ -18,6 +18,9 @@ test("BrainClaw ships a generic memory-data-engineer skill", () => {
   const source = fs.readFileSync(genericSkillPath, "utf8");
 
   assert.match(source, /^name:\s*memory-data-engineer$/m);
-  assert.match(source, /^description:\s*Generic memory data engineering skill for any OpenClaw agent\./m);
+  assert.match(
+    source,
+    /^description:\s*The Memory Data Engineering skill for The BrainClaw Hybrid GraphRAG Memory Management OpenClaw Agent\.$/m,
+  );
   assert.match(source, /^# Memory Data Engineer$/m);
 });

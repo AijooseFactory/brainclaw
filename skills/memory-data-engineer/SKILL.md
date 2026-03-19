@@ -1,6 +1,6 @@
 ---
 name: memory-data-engineer
-description: Generic memory data engineering skill for any OpenClaw agent. Provides context-aware memory retrieval and consistency checking.
+description: The Memory Data Engineering skill for The BrainClaw Hybrid GraphRAG Memory Management OpenClaw Agent.
 ---
 
 # Memory Data Engineer
