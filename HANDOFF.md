@@ -78,8 +78,23 @@ The BrainClaw TypeScript source is under `src/` and currently includes:
   - `contradiction_detector`
   - `lossless_claw_integration`
   - `operational_memory_sync`
+  - `memory_file_watcher`
 
 These are actually present in the repo. Do not claim they are missing without checking the BrainClaw repo path above.
+
+### Bidirectional Sync Architecture (MEMORY.md ↔ DB)
+
+BrainClaw keeps each agent's `MEMORY.md` and the canonical Postgres memory in sync bidirectionally. `MEMORY.md` is the backup mirror — if the DB is lost, memory can be restored from the file.
+
+| Direction | Trigger | Code Path |
+|-----------|---------|----------|
+| DB → MEMORY.md | Agent ingests memory | `ingest_event` → `append_memory_backup` |
+| DB → MEMORY.md | User edits BrainClaw Memory in Control UI | `update_memory` → `upsert_memory_backup` |
+| DB → MEMORY.md | Agent end capture hook | `agent_end_capture` → `ingest_event` |
+| MEMORY.md → DB | User saves MEMORY.md in Control UI | `agents.files.set` → `syncAgentBrainClawMemoryBackup` → `sync_memory_md_backup` |
+| MEMORY.md → DB | External edit (VS Code, agent, script) | `memory_file_watcher` service → `sync_memory_md_backup` |
+
+The file watcher uses `fs.watchFile` (stat polling, 2s default interval) with SHA-256 content deduplication to detect external edits. It can be disabled via `memoryFileWatcherEnabled: false` in plugin config.
 
 ### Shipped BrainClaw skill
 

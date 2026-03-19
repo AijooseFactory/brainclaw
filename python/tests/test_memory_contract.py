@@ -296,6 +296,65 @@ def test_memory_backup_appends_promoted_memory_to_agent_specific_memory_md_once(
     assert text.count("brainclaw:id=mem-123") == 1
 
 
+def test_memory_backup_rewrites_existing_brainclaw_entry_instead_of_appending_duplicate(tmp_path):
+    from openclaw_memory.integration.memory_backup import append_memory_backup
+
+    state_dir = tmp_path / "state"
+    agent_dir = state_dir / "agents" / "lore" / "agent"
+    agent_dir.mkdir(parents=True)
+    memory_md = agent_dir / "MEMORY.md"
+    memory_md.write_text(
+        """# Lore Memory
+
+## Existing Decision
+<!-- brainclaw:id=mem-123 class=decision -->
+- BrainClaw ID: `mem-123`
+- Memory Class: `decision`
+
+Old content that should be replaced.
+""",
+        encoding="utf-8",
+    )
+
+    config_path = state_dir / "openclaw.json"
+    config_path.write_text(
+        """
+        {
+          "agents": {
+            "list": [
+              {
+                "id": "lore",
+                "agentDir": "%s"
+              }
+            ]
+          }
+        }
+        """
+        % agent_dir.as_posix(),
+        encoding="utf-8",
+    )
+
+    append_memory_backup(
+        agent_id="lore",
+        memory_record={
+            "id": "mem-123",
+            "content": "New content that must mirror the canonical memory.",
+            "metadata": {
+                "memory_class": "decision",
+                "decision_summary": "Existing Decision",
+            },
+            "provenance": {"source_session_id": "sess-1"},
+        },
+        state_dir=state_dir,
+        config_path=config_path,
+    )
+
+    updated = memory_md.read_text(encoding="utf-8")
+    assert updated.count("brainclaw:id=mem-123") == 1
+    assert "Old content that should be replaced." not in updated
+    assert "New content that must mirror the canonical memory." in updated
+
+
 def test_ingest_event_stringifies_source_ids_before_psycopg_insert():
     bridge_path = (
         Path(__file__).resolve().parents[1]
@@ -523,3 +582,114 @@ def test_ingest_event_persists_decision_and_procedural_semantics(monkeypatch):
     assert len(procedural_row[15]["workflow_steps"]) == 3
     assert procedural_row[15]["workflow_steps"][0]["description"] == "Restart the container."
     assert procedural_row[23]["backup_mode"] == "memory-md-first"
+
+
+def test_update_memory_rewrites_memory_md_backup_after_superseding(monkeypatch):
+    import sys
+    import types
+
+    from openclaw_memory import bridge_entrypoints
+    from openclaw_memory.integration import memory_backup
+
+    rewritten = []
+
+    def fake_upsert_memory_backup(*, agent_id, memory_record, state_dir=None, config_path=None):
+        rewritten.append((agent_id, memory_record["id"], memory_record["content"]))
+        return "/tmp/lore/MEMORY.md"
+
+    class FakeCursor:
+        def __init__(self):
+            self._fetchone_values = [
+                {
+                    "id": "11111111-1111-4111-8111-111111111111",
+                    "tenant_id": "tenant-1",
+                    "agent_id": "agent-1",
+                    "memory_class": "decision",
+                    "memory_type": "technical",
+                    "status": "active",
+                    "content": "Old decision",
+                    "metadata": {"memory_class": "decision"},
+                    "source_message_id": None,
+                    "source_session_id": None,
+                    "source_tool_call_id": None,
+                    "extracted_by": "brainclaw",
+                    "extraction_method": "heuristic_upsert",
+                    "extraction_timestamp": None,
+                    "extractor_name": "brainclaw",
+                    "extractor_version": "1.3.0",
+                    "extraction_confidence": 0.9,
+                    "extraction_metadata": {},
+                    "confidence": 0.9,
+                    "visibility_scope": "agent",
+                    "superseded_by": None,
+                    "supersession_reason": None,
+                    "created_at": None,
+                    "updated_at": None,
+                    "is_current": True,
+                },
+                {
+                    "id": "22222222-2222-4222-8222-222222222222",
+                    "tenant_id": "tenant-1",
+                    "agent_id": "agent-1",
+                    "memory_class": "decision",
+                    "memory_type": "technical",
+                    "status": "active",
+                    "content": "New decision",
+                    "metadata": {"memory_class": "decision"},
+                    "source_message_id": None,
+                    "source_session_id": None,
+                    "source_tool_call_id": None,
+                    "extracted_by": "brainclaw",
+                    "extraction_method": "heuristic_upsert",
+                    "extraction_timestamp": None,
+                    "extractor_name": "brainclaw",
+                    "extractor_version": "1.3.0",
+                    "extraction_confidence": 0.9,
+                    "extraction_metadata": {},
+                    "confidence": 0.9,
+                    "visibility_scope": "agent",
+                    "superseded_by": None,
+                    "supersession_reason": "Control UI correction",
+                    "created_at": None,
+                    "updated_at": None,
+                },
+            ]
+
+        def execute(self, sql, params=None):
+            return None
+
+        def fetchone(self):
+            return self._fetchone_values.pop(0)
+
+    class FakeConnection:
+        def __init__(self):
+            self.cursor_instance = FakeCursor()
+            self.committed = False
+
+        def cursor(self, cursor_factory=None):
+            return self.cursor_instance
+
+        def commit(self):
+            self.committed = True
+
+        def close(self):
+            return None
+
+    fake_connection = FakeConnection()
+    fake_extras = types.SimpleNamespace(RealDictCursor=object, Json=lambda value: value)
+    fake_psycopg2 = types.SimpleNamespace(connect=lambda _: fake_connection, extras=fake_extras)
+
+    monkeypatch.setattr(memory_backup, "upsert_memory_backup", fake_upsert_memory_backup)
+    monkeypatch.setattr(bridge_entrypoints, "_postgres_url", lambda: "postgresql://brainclaw-test")
+    monkeypatch.setitem(sys.modules, "psycopg2", fake_psycopg2)
+    monkeypatch.setitem(sys.modules, "psycopg2.extras", fake_extras)
+
+    result = bridge_entrypoints.update_memory(
+        agent_id="lore",
+        memory_id="11111111-1111-4111-8111-111111111111",
+        content="New decision",
+        reason="Control UI correction",
+    )
+
+    assert result["ok"] is True
+    assert rewritten == [("lore", "22222222-2222-4222-8222-222222222222", "New decision")]

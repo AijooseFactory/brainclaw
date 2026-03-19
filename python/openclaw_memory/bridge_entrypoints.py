@@ -12,6 +12,7 @@ All functions here are:
 import os
 import asyncio
 import json
+import hashlib
 import logging
 import uuid
 import datetime
@@ -168,6 +169,197 @@ def _safe_uuid(value: Optional[object]) -> Optional[uuid.UUID]:
 def _db_uuid_text(value: Optional[object]) -> Optional[str]:
     parsed = _safe_uuid(value)
     return str(parsed) if parsed else None
+
+
+def _memory_md_snapshot_metadata(*, backup_path: str, content: str) -> dict:
+    return {
+        "backup_kind": "memory_md_snapshot",
+        "backup_path": backup_path,
+        "backup_sync_mode": "bidirectional",
+        "hidden_from_dashboard": True,
+        "file_hash": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+    }
+
+
+def _supersede_current_memory_row(cur, *, original_id: str, new_content: str, update_reason: str) -> dict:
+    cur.execute(
+        """
+        UPDATE memory_items
+        SET is_current = FALSE,
+            supersession_reason = %s,
+            updated_at = NOW()
+        WHERE id = %s
+        """,
+        (update_reason, original_id),
+    )
+    cur.execute(
+        """
+        INSERT INTO memory_items (
+            tenant_id, agent_id, memory_class, memory_type, status,
+            content, source_message_id, source_session_id,
+            source_tool_call_id, extracted_by, extraction_method,
+            extraction_timestamp, extractor_name, extractor_version,
+            extraction_confidence, extraction_metadata, confidence,
+            user_confirmed, user_confirmed_at, user_confirmed_by,
+            valid_from, valid_to, is_current, superseded_by,
+            supersession_reason, visibility_scope, access_control,
+            retention_policy, retention_until, weaviate_id,
+            neo4j_id, weaviate_synced, neo4j_synced,
+            weaviate_synced_at, neo4j_synced_at, sync_version,
+            metadata
+        )
+        SELECT
+            tenant_id, agent_id, memory_class, memory_type, status,
+            %s, source_message_id, source_session_id,
+            source_tool_call_id, extracted_by, extraction_method,
+            NOW(), COALESCE(extractor_name, extracted_by, 'brainclaw-control-ui'),
+            COALESCE(extractor_version, '1.3.0'),
+            extraction_confidence, COALESCE(extraction_metadata, '{}'::jsonb),
+            confidence, user_confirmed,
+            user_confirmed_at, user_confirmed_by, NOW(), NULL,
+            TRUE, %s, %s, visibility_scope,
+            COALESCE(access_control, '{}'::jsonb), retention_policy,
+            retention_until, NULL, NULL, FALSE, FALSE, NULL, NULL,
+            COALESCE(sync_version, 1) + 1, COALESCE(metadata, '{}'::jsonb)
+        FROM memory_items
+        WHERE id = %s
+        RETURNING id, tenant_id, agent_id, memory_class, memory_type, status,
+                  content, metadata, source_message_id, source_session_id,
+                  source_tool_call_id, extracted_by, extraction_method,
+                  extraction_timestamp, extractor_name, extractor_version,
+                  extraction_confidence, extraction_metadata, confidence,
+                  visibility_scope, superseded_by, supersession_reason,
+                  created_at, updated_at
+        """,
+        (new_content, original_id, update_reason, original_id),
+    )
+    next_row = dict(cur.fetchone() or {})
+    if not next_row:
+        return {}
+
+    cur.execute(
+        """
+        UPDATE memory_items
+        SET superseded_by = %s,
+            updated_at = NOW()
+        WHERE id = %s
+        """,
+        (str(next_row["id"]), original_id),
+    )
+    return next_row
+
+
+def _upsert_memory_md_snapshot_record(
+    cur,
+    *,
+    agent_db_id: str,
+    tenant_db_id: str | None,
+    content: str,
+    backup_path: str,
+    update_reason: str,
+    json_wrapper,
+) -> dict | None:
+    snapshot_metadata = _memory_md_snapshot_metadata(backup_path=backup_path, content=content)
+    cur.execute(
+        """
+        SELECT id, tenant_id, agent_id, memory_class, memory_type, status,
+               content, metadata, source_message_id, source_session_id,
+               source_tool_call_id, extracted_by, extraction_method,
+               extraction_timestamp, extractor_name, extractor_version,
+               extraction_confidence, extraction_metadata, confidence,
+               visibility_scope, superseded_by, supersession_reason,
+               created_at, updated_at
+        FROM memory_items
+        WHERE agent_id::text = %s
+          AND is_current = TRUE
+          AND COALESCE(metadata->>'backup_kind', '') = 'memory_md_snapshot'
+        ORDER BY COALESCE(updated_at, created_at) DESC
+        LIMIT 1
+        """,
+        (agent_db_id,),
+    )
+    current_row = dict(cur.fetchone() or {})
+    if current_row and str(current_row.get("content") or "").strip() == content.strip():
+        return current_row
+
+    if current_row:
+        next_row = _supersede_current_memory_row(
+            cur,
+            original_id=str(current_row["id"]),
+            new_content=content,
+            update_reason=update_reason,
+        )
+        if next_row:
+            cur.execute(
+                """
+                UPDATE memory_items
+                SET metadata = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+                """,
+                (json_wrapper(snapshot_metadata), str(next_row["id"])),
+            )
+            next_row["metadata"] = snapshot_metadata
+            return next_row
+        return None
+
+    now = datetime.datetime.utcnow()
+    cur.execute(
+        """
+        INSERT INTO memory_items (
+            id, tenant_id, agent_id, memory_class, memory_type, status,
+            content, extracted_by, extraction_method, extraction_timestamp,
+            extractor_name, extractor_version, extraction_confidence,
+            extraction_metadata, confidence, user_confirmed, valid_from,
+            is_current, visibility_scope, access_control, retention_policy,
+            metadata, created_at, updated_at
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s,
+            %s, %s, %s,
+            %s, %s, %s, %s,
+            %s, %s, %s, %s,
+            %s, %s, %s
+        )
+        RETURNING id, tenant_id, agent_id, memory_class, memory_type, status,
+                  content, metadata, source_message_id, source_session_id,
+                  source_tool_call_id, extracted_by, extraction_method,
+                  extraction_timestamp, extractor_name, extractor_version,
+                  extraction_confidence, extraction_metadata, confidence,
+                  visibility_scope, superseded_by, supersession_reason,
+                  created_at, updated_at
+        """,
+        (
+            str(uuid.uuid4()),
+            tenant_db_id,
+            agent_db_id,
+            "summary",
+            "memory_md_backup",
+            "active",
+            content,
+            "brainclaw",
+            "memory_md_backup_sync",
+            now,
+            "brainclaw",
+            "1.3.0",
+            1.0,
+            json_wrapper({"backup_kind": "memory_md_snapshot"}),
+            1.0,
+            True,
+            now,
+            True,
+            "agent",
+            json_wrapper({}),
+            "default",
+            json_wrapper(snapshot_metadata),
+            now,
+            now,
+        ),
+    )
+    inserted = dict(cur.fetchone() or {})
+    if inserted:
+        inserted["metadata"] = snapshot_metadata
+    return inserted or None
 
 
 def _parse_alternatives(content: str) -> list[str]:
@@ -1124,6 +1316,21 @@ def ingest_event(event: dict = None, **kwargs) -> dict:
                             metadata={"backup_path": backup_path, "raw_memory_id": str(raw_id)},
                         )
 
+                        if backup_path:
+                            try:
+                                file_content = Path(backup_path).read_text(encoding="utf-8")
+                                _upsert_memory_md_snapshot_record(
+                                    cur,
+                                    agent_db_id=agent_db_id,
+                                    tenant_db_id=tenant_db_id,
+                                    content=file_content,
+                                    backup_path=backup_path,
+                                    update_reason="Synced from BrainClaw canonical ingest",
+                                    json_wrapper=psycopg2.extras.Json,
+                                )
+                            except Exception as backup_sync_error:
+                                logger.warning("Failed to refresh MEMORY.md snapshot after ingest: %s", backup_sync_error)
+
             # Determine searchable status:
             # - For PROMOTED items: queued for async indexing to Weaviate (not immediately searchable)
             # - For CAPTURED_RAW: only stored in PostgreSQL, searchable via fallback only
@@ -1203,6 +1410,7 @@ def retrieve_sync(query: str = "", intent: str = "general", agent_id: str = "sys
                            created_at, metadata
                     FROM memory_items
                     WHERE content ILIKE $1
+                      AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'
                     ORDER BY agent_id, content, created_at DESC
                     LIMIT $2
                 """
@@ -1283,7 +1491,9 @@ def retrieve_sync(query: str = "", intent: str = "general", agent_id: str = "sys
             """SELECT DISTINCT ON (agent_id, content)
                       id, content, metadata, created_at
                FROM memory_items
-               WHERE agent_id = %s AND content ILIKE %s
+               WHERE agent_id = %s
+                 AND content ILIKE %s
+                 AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'
                ORDER BY agent_id, content, created_at DESC LIMIT %s""",
             (agent_uuid, f"%{query}%", top_k),
         )
@@ -1427,6 +1637,418 @@ def get_memory(memory_id: str = "", **kwargs) -> dict:
         return {"error": str(e2)}
 
 
+def _normalize_memory_area(area: str) -> str:
+    normalized = (area or "all").strip().lower()
+    allowed = {
+        "all",
+        "knowledge",
+        "conversation",
+        "identity",
+        "semantic",
+        "relational",
+        "decision",
+        "procedural",
+        "episodic",
+        "summary",
+    }
+    return normalized if normalized in allowed else "all"
+
+
+def _memory_area_condition(area: str) -> tuple[str, list]:
+    normalized = _normalize_memory_area(area)
+    if normalized == "all":
+        return ("", [])
+    if normalized == "knowledge":
+        return (
+            " AND COALESCE(memory_class, 'semantic') NOT IN ('episodic', 'summary')",
+            [],
+        )
+    if normalized == "conversation":
+        return (
+            " AND COALESCE(memory_class, 'semantic') IN ('episodic', 'summary')",
+            [],
+        )
+    return (" AND COALESCE(memory_class, 'semantic') = %s", [normalized])
+
+
+def list_memories(
+    agent_id: str = "",
+    query: str = "",
+    area: str = "all",
+    limit: int = 25,
+    page: int = 1,
+    threshold: float = 0.6,
+    include_superseded: bool = False,
+    **kwargs,
+) -> dict:
+    try:
+        import math
+        import psycopg2
+        import psycopg2.extras
+        from openclaw_memory.security.access_control import (
+            get_current_agent_db_id,
+            get_current_tenant_db_id,
+        )
+
+        canonical_agent_uuid = _coerce_identity_uuid(agent_id or get_current_agent_db_id())
+        if canonical_agent_uuid is None:
+            return {"error": "agent_id is required"}
+
+        normalized_limit = max(1, min(int(limit or 25), 1000))
+        normalized_page = max(1, int(page or 1))
+        normalized_threshold = max(0.0, min(float(threshold or 0.0), 1.0))
+        offset = (normalized_page - 1) * normalized_limit
+
+        current_clause = "" if include_superseded else " AND is_current = TRUE"
+        total_params = [str(canonical_agent_uuid)]
+        total_query = f"""
+            SELECT COUNT(*)
+            FROM memory_items
+            WHERE agent_id::text = %s
+            {current_clause}
+              AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'
+        """
+
+        filter_params = [str(canonical_agent_uuid)]
+        filter_query = """
+            FROM memory_items
+            WHERE agent_id::text = %s
+        """
+        if not include_superseded:
+            filter_query += " AND is_current = TRUE"
+        filter_query += " AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'"
+        filter_query += " AND COALESCE(confidence, 0) >= %s"
+        filter_params.append(normalized_threshold)
+
+        search_term = (query or "").strip()
+        if search_term:
+            filter_query += " AND content ILIKE %s"
+            filter_params.append(f"%{search_term}%")
+
+        area_condition, area_params = _memory_area_condition(area)
+        filter_query += area_condition
+        filter_params.extend(area_params)
+
+        counts_query = f"""
+            SELECT
+                COUNT(*) AS filtered,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(memory_class, 'semantic') NOT IN ('episodic', 'summary')
+                ) AS knowledge,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(memory_class, 'semantic') IN ('episodic', 'summary')
+                ) AS conversation
+            {filter_query}
+        """
+        items_query = f"""
+            SELECT id, tenant_id, agent_id, memory_class, memory_type, status,
+                   content, metadata, source_message_id, source_session_id,
+                   source_tool_call_id, extracted_by, extraction_method,
+                   extraction_timestamp, extractor_name, extractor_version,
+                   extraction_confidence, extraction_metadata, confidence,
+                   visibility_scope, superseded_by, supersession_reason,
+                   created_at, updated_at
+            {filter_query}
+            ORDER BY COALESCE(updated_at, created_at) DESC, created_at DESC
+            LIMIT %s OFFSET %s
+        """
+        item_params = [*filter_params, normalized_limit, offset]
+
+        conn = psycopg2.connect(_postgres_url())
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(total_query, total_params)
+        total = int((cur.fetchone() or {}).get("count") or 0)
+
+        cur.execute(counts_query, filter_params)
+        counts = dict(cur.fetchone() or {})
+        filtered = int(counts.get("filtered") or 0)
+        knowledge = int(counts.get("knowledge") or 0)
+        conversation = int(counts.get("conversation") or 0)
+
+        cur.execute(items_query, item_params)
+        rows = [dict(row) for row in cur.fetchall()]
+        items = [_format_memory_record(row) for row in rows]
+
+        _record_retrieval_log(
+            cur,
+            agent_db_id=get_current_agent_db_id(),
+            tenant_db_id=get_current_tenant_db_id(),
+            session_id=None,
+            query_text=search_term or "brainclaw_memory_dashboard",
+            intent="brainclaw_memory_dashboard",
+            query_plan={
+                "mode": "canonical_postgres_list",
+                "area": _normalize_memory_area(area),
+                "threshold": normalized_threshold,
+                "limit": normalized_limit,
+                "page": normalized_page,
+                "include_superseded": include_superseded,
+            },
+            results=items,
+        )
+        conn.commit()
+        conn.close()
+
+        return {
+            "agentId": agent_id or str(canonical_agent_uuid),
+            "total": total,
+            "filtered": filtered,
+            "knowledge": knowledge,
+            "conversation": conversation,
+            "page": normalized_page,
+            "pageSize": normalized_limit,
+            "pageCount": math.ceil(filtered / normalized_limit) if filtered else 0,
+            "items": items,
+        }
+    except Exception as error:
+        logger.error("BrainClaw memory list failed: %s", error)
+        return {"error": str(error)}
+
+
+def update_memory(
+    agent_id: str = "",
+    memory_id: str = "",
+    content: str = "",
+    reason: str = "",
+    **kwargs,
+) -> dict:
+    if not memory_id:
+        return {"error": "memory_id is required"}
+    if not str(content or "").strip():
+        return {"error": "content is required"}
+
+    try:
+        import psycopg2
+        import psycopg2.extras
+        from openclaw_memory.integration.memory_backup import upsert_memory_backup
+        from openclaw_memory.security.access_control import get_current_agent_id
+
+        canonical_agent_uuid = _coerce_identity_uuid(agent_id)
+        original_uuid = _safe_uuid(memory_id)
+        if canonical_agent_uuid is None:
+            return {"error": "agent_id is required"}
+        if original_uuid is None:
+            return {"error": f"Invalid memory_id: {memory_id}"}
+
+        update_reason = (reason or "").strip() or "Edited from OpenClaw Control UI"
+        new_content = str(content).strip()
+        conn = psycopg2.connect(_postgres_url())
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """
+            SELECT id, tenant_id, agent_id, memory_class, memory_type, status,
+                   content, metadata, source_message_id, source_session_id,
+                   source_tool_call_id, extracted_by, extraction_method,
+                   extraction_timestamp, extractor_name, extractor_version,
+                   extraction_confidence, extraction_metadata, confidence,
+                   visibility_scope, superseded_by, supersession_reason,
+                   created_at, updated_at, is_current
+            FROM memory_items
+            WHERE id = %s
+              AND agent_id::text = %s
+              AND is_current = TRUE
+            LIMIT 1
+            """,
+            (str(original_uuid), str(canonical_agent_uuid)),
+        )
+        original_row = cur.fetchone()
+        if not original_row:
+            conn.close()
+            return {"error": f"Memory record not found for agent: {memory_id}"}
+
+        next_row = _supersede_current_memory_row(
+            cur,
+            original_id=str(original_uuid),
+            new_content=new_content,
+            update_reason=update_reason,
+        )
+        if not next_row:
+            conn.rollback()
+            conn.close()
+            return {"error": f"Failed to supersede memory record: {memory_id}"}
+        _record_audit_event(
+            cur,
+            actor_id=str(get_current_agent_id() or agent_id or "system"),
+            action="UPDATE",
+            resource_type="memory_item",
+            resource_id=str(original_uuid),
+            before_state=_format_memory_record(dict(original_row)),
+            after_state=_format_memory_record(next_row),
+            metadata={
+                "via": "brainclaw_memory_dashboard",
+                "reason": update_reason,
+                "superseded_by": str(next_row["id"]),
+            },
+        )
+        backup_path = upsert_memory_backup(
+            agent_id=agent_id,
+            memory_record={
+                "id": str(next_row["id"]),
+                "content": next_row["content"],
+                "metadata": _coerce_json_container(next_row.get("metadata"), default={}),
+                "created_at": next_row.get("created_at").isoformat() if next_row.get("created_at") else None,
+                "provenance": {
+                    "extraction_timestamp": next_row.get("extraction_timestamp").isoformat()
+                    if next_row.get("extraction_timestamp")
+                    else None,
+                },
+            },
+        )
+        if backup_path and Path(backup_path).exists():
+            file_content = Path(backup_path).read_text(encoding="utf-8")
+            _upsert_memory_md_snapshot_record(
+                cur,
+                agent_db_id=str(canonical_agent_uuid),
+                tenant_db_id=_stringify_uuid(original_row.get("tenant_id")),
+                content=file_content,
+                backup_path=backup_path,
+                update_reason=update_reason,
+                json_wrapper=psycopg2.extras.Json,
+            )
+        conn.commit()
+        conn.close()
+        return {
+            "ok": True,
+            "agentId": agent_id or str(canonical_agent_uuid),
+            "previousMemoryId": str(original_uuid),
+            "backupPath": backup_path,
+            "memory": _format_memory_record(next_row),
+        }
+    except Exception as error:
+        logger.error("BrainClaw memory update failed: %s", error)
+        return {"error": str(error)}
+
+
+def sync_memory_md_backup(
+    agent_id: str = "",
+    content: str = "",
+    file_path: str = "",
+    reason: str = "",
+    **kwargs,
+) -> dict:
+    if not agent_id:
+        return {"error": "agent_id is required"}
+    if content is None:
+        return {"error": "content is required"}
+
+    try:
+        import psycopg2
+        import psycopg2.extras
+        from openclaw_memory.integration.memory_backup import (
+            parse_memory_backup_entries,
+            resolve_agent_memory_md,
+        )
+        from openclaw_memory.security.access_control import get_current_agent_id, get_current_tenant_id
+
+        canonical_agent_uuid = _coerce_identity_uuid(agent_id)
+        canonical_tenant_uuid = _coerce_identity_uuid(get_current_tenant_id())
+        if canonical_agent_uuid is None:
+            return {"error": "agent_id is required"}
+
+        normalized_content = str(content)
+        backup_path = file_path or str(resolve_agent_memory_md(agent_id))
+        update_reason = (reason or "").strip() or "Synchronized from MEMORY.md"
+        mirrored_entries = parse_memory_backup_entries(normalized_content)
+
+        conn = psycopg2.connect(_postgres_url())
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        updated_memory_ids: list[str] = []
+        for entry in mirrored_entries:
+            entry_uuid = _safe_uuid(entry.get("id"))
+            if entry_uuid is None:
+                continue
+            cur.execute(
+                """
+                SELECT id, tenant_id, agent_id, memory_class, memory_type, status,
+                       content, metadata, source_message_id, source_session_id,
+                       source_tool_call_id, extracted_by, extraction_method,
+                       extraction_timestamp, extractor_name, extractor_version,
+                       extraction_confidence, extraction_metadata, confidence,
+                       visibility_scope, superseded_by, supersession_reason,
+                       created_at, updated_at, is_current
+                FROM memory_items
+                WHERE id = %s
+                  AND agent_id::text = %s
+                  AND is_current = TRUE
+                LIMIT 1
+                """,
+                (str(entry_uuid), str(canonical_agent_uuid)),
+            )
+            original_row = cur.fetchone()
+            if not original_row:
+                continue
+            original_row = dict(original_row)
+            new_content = str(entry.get("content") or "").strip()
+            if not new_content or new_content == str(original_row.get("content") or "").strip():
+                continue
+
+            next_row = _supersede_current_memory_row(
+                cur,
+                original_id=str(entry_uuid),
+                new_content=new_content,
+                update_reason=update_reason,
+            )
+            if not next_row:
+                continue
+
+            updated_metadata = _coerce_json_container(next_row.get("metadata"), default={})
+            updated_metadata.update(
+                {
+                    "backup_mode": "memory-md-bidirectional",
+                    "backup_path": backup_path,
+                }
+            )
+            cur.execute(
+                """
+                UPDATE memory_items
+                SET metadata = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+                """,
+                (psycopg2.extras.Json(updated_metadata), str(next_row["id"])),
+            )
+            next_row["metadata"] = updated_metadata
+            updated_memory_ids.append(str(next_row["id"]))
+            _record_audit_event(
+                cur,
+                actor_id=str(get_current_agent_id() or agent_id or "system"),
+                action="SYNC",
+                resource_type="memory_item",
+                resource_id=str(entry_uuid),
+                before_state=_format_memory_record(original_row),
+                after_state=_format_memory_record(next_row),
+                metadata={
+                    "via": "memory_md_sync",
+                    "reason": update_reason,
+                    "backup_path": backup_path,
+                },
+            )
+
+        snapshot_row = _upsert_memory_md_snapshot_record(
+            cur,
+            agent_db_id=str(canonical_agent_uuid),
+            tenant_db_id=str(canonical_tenant_uuid) if canonical_tenant_uuid else None,
+            content=normalized_content,
+            backup_path=backup_path,
+            update_reason=update_reason,
+            json_wrapper=psycopg2.extras.Json,
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "ok": True,
+            "agentId": agent_id,
+            "filePath": backup_path,
+            "mirroredEntryCount": len(mirrored_entries),
+            "updatedMemoryIds": updated_memory_ids,
+            "snapshotId": _stringify_uuid(snapshot_row.get("id")) if snapshot_row else None,
+        }
+    except Exception as error:
+        logger.error("BrainClaw MEMORY.md backup sync failed: %s", error)
+        return {"error": str(error)}
+
+
 # ---------------------------------------------------------------------------
 # check_contradictions / verify_audit_integrity — bridge entry points
 # ---------------------------------------------------------------------------
@@ -1453,6 +2075,7 @@ def check_contradictions(
             SELECT id, content, metadata, memory_class, memory_type
             FROM memory_items
             WHERE is_current = TRUE
+              AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'
               AND (
                 agent_id::text = %s
                 OR visibility_scope IN ('tenant', 'public')

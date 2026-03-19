@@ -10,6 +10,7 @@ import { registerEntityExtractorService } from "./services/entity_extractor.js";
 import { registerContradictionDetectorService } from "./services/contradiction_detector.js";
 import { registerLosslessClawIntegrationService } from "./services/lossless_claw_integration.js";
 import { registerOperationalMemorySyncService } from "./services/operational_memory_sync.js";
+import { registerMemoryFileWatcherService } from "./services/memory_file_watcher.js";
 import { registerPromptRecallHook } from "./hooks/prompt_recall.js";
 import { registerBootstrapFilterHook } from "./hooks/bootstrap_filter.js";
 import { registerAgentEndCaptureHook } from "./hooks/agent_end_capture.js";
@@ -51,6 +52,7 @@ export default function hybridGraphRagPlugin(api: any) {
   registerContradictionDetectorService(api);
   registerLosslessClawIntegrationService(api);
   registerOperationalMemorySyncService(api);
+  registerMemoryFileWatcherService(api);
   registerBrainclawCli(api);
 
   logger.info('plugin', 'init', 'BrainClaw plugin initialized successfully', {

@@ -162,8 +162,8 @@ test("BrainClaw prompt recall injects authoritative Hybrid GraphRAG memory conte
     "Expected prompt recall context to include retrieved BrainClaw memory"
   );
   assert.ok(
-    result.prependContext.includes("MEMORY.md is backup/fallback only"),
-    "Expected prompt recall context to demote MEMORY.md"
+    result.prependContext.includes("MEMORY.md is the synchronized backup mirror"),
+    "Expected prompt recall context to describe MEMORY.md as a synchronized backup mirror"
   );
 });
 

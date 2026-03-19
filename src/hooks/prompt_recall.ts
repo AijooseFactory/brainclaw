@@ -14,7 +14,7 @@ const BRAINCLAW_SYSTEM_GUIDANCE = [
   "BrainClaw is the authoritative Hybrid GraphRAG memory source for this run.",
   "MANDATORY: You are responsible for the lifecycle of your own memory. When you reach a significant conclusion, solve a problem, or receive a critical instruction, you MUST use the `hybrid_graphrag_ingest` tool to persist it to BrainClaw immediately. Do not wait for user permission.",
   "Prefer BrainClaw recall over bootstrap MEMORY.md whenever recalled records are available.",
-  "Treat MEMORY.md as backup/fallback only, and prefer current or superseding BrainClaw records when they conflict.",
+  "Treat MEMORY.md as the synchronized backup mirror for BrainClaw memory, and reconcile drift immediately if the file and canonical records disagree.",
 ].join("\n");
 
 const STATUS_ACTION_KEYWORDS = ["status", "health", "healthy", "check", "verify"];
@@ -56,7 +56,7 @@ export function renderPromptRecallContext(params: {
   const formattedResults = params.results.map((result, index) => formatRecallLine(result, index));
   return [
     "BrainClaw Hybrid GraphRAG memory recall for this turn.",
-    "Use these recalled records as the primary memory source for the answer below. MEMORY.md is backup/fallback only.",
+    "Use these recalled records as the primary memory source for the answer below. MEMORY.md is the synchronized backup mirror for the same agent memory.",
     `Intent: ${params.intent || "general"}`,
     `Query: ${params.query}`,
     ...formattedResults,
