@@ -128,6 +128,15 @@ brainclaw lcm sync --mode incremental
 brainclaw rebuild --target neo4j
 ```
 
+## Verification & Benchmarks
+
+For the definitive quantitative metrics and operational proof of the **v1.5.0-intel-perfection** release, please see the [BENCHMARK.md](./BENCHMARK.md).
+
+- **Graph Density**: 19,427 relationships across 766 nodes.
+- **Thematic Consolidation**: 173 communities (Leiden 0.1 Resolution).
+- **Sync Performance**: < 450ms average latency.
+- **Identity Integrity**: 100% "Knowledgebase" terminological synchronization.
+
 Healthy BrainClaw + Lossless-Claw integration should show:
 
 - `compatibility_state: installed_compatible`
