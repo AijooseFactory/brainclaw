@@ -56,6 +56,7 @@ MEMORY_CHUNK_SCHEMA = {
         "ef": 64,
         "efConstruction": 128,
         "maxConnections": 32,
+        "bq": {"enabled": True},
     },
     "vectorizer": "text2vec-openai",
     "moduleConfig": {
@@ -84,6 +85,7 @@ SUMMARY_SCHEMA = {
     "description": "Session and conversation summaries",
     "vectorIndexConfig": {
         "distance": "cosine",
+        "bq": {"enabled": True},
     },
     "vectorizer": "text2vec-openai",
     "moduleConfig": {
@@ -108,6 +110,7 @@ ENTITY_SCHEMA = {
     "description": "Named entities extracted from conversations",
     "vectorIndexConfig": {
         "distance": "cosine",
+        "bq": {"enabled": True},
     },
     "vectorizer": "text2vec-openai",
     "moduleConfig": {
@@ -134,6 +137,7 @@ DECISION_SCHEMA = {
     "description": "Decisions with semantic search",
     "vectorIndexConfig": {
         "distance": "cosine",
+        "bq": {"enabled": True},
     },
     "vectorizer": "text2vec-openai",
     "moduleConfig": {

@@ -24,11 +24,20 @@ class Intent(str, Enum):
     DRILL_DOWN_REQUEST = "drill_down_request"
 
 
+class RetrievalMode(str, Enum):
+    """Research-backed retrieval modes for BrainClaw v1.5.0-perfect."""
+    LOCAL = "local"     # Facts, procedures, narrow entity recall
+    GLOBAL = "global"   # Cross-project themes, community summaries
+    DRIFT = "drift"     # Blended local/global for comprehensiveness
+    LAZY = "lazy"      # Deferred/efficient indexing for high-volume data
+
+
 @dataclass
 class ClassificationResult:
     """Result of intent classification."""
     primary_intent: Intent
     confidence: float
+    target_mode: RetrievalMode = RetrievalMode.LOCAL
     all_intents: List[Tuple[Intent, float]] = field(default_factory=list)
     route_log: str = ""  # FR-021: observable route selection
 
@@ -191,6 +200,24 @@ class IntentClassifier:
                 re.compile(p, re.IGNORECASE) for p in patterns
             ]
     
+    def _map_mode(self, intent: Intent) -> RetrievalMode:
+        """Map intent to research-backed retrieval mode."""
+        mapping = {
+            Intent.FACT_LOOKUP: RetrievalMode.LOCAL,
+            Intent.PROCEDURAL_RECALL: RetrievalMode.LOCAL,
+            Intent.ISSUE_EVENT_RECALL: RetrievalMode.LOCAL,
+            Intent.PREFERENCE_CONSTRAINT_RECALL: RetrievalMode.LOCAL,
+            Intent.OWNERSHIP_QUERY: RetrievalMode.LOCAL,
+            
+            Intent.RELATIONSHIP_QUERY: RetrievalMode.GLOBAL,
+            Intent.CHANGE_DETECTION: RetrievalMode.GLOBAL,
+            Intent.CONTRADICTION_REVIEW: RetrievalMode.GLOBAL,
+            
+            Intent.DECISION_RECALL: RetrievalMode.DRIFT,
+            Intent.DRILL_DOWN_REQUEST: RetrievalMode.DRIFT,
+        }
+        return mapping.get(intent, RetrievalMode.LOCAL)
+
     def classify(self, query: str) -> ClassificationResult:
         """Classify a query into intent types.
         
@@ -198,7 +225,7 @@ class IntentClassifier:
             query: The user's query string.
             
         Returns:
-            ClassificationResult with primary intent, confidence, and all matches.
+            ClassificationResult with primary intent, confidence, target_mode, and matches.
         """
         query_lower = query.lower()
         
@@ -230,6 +257,7 @@ class IntentClassifier:
             return ClassificationResult(
                 primary_intent=Intent.FACT_LOOKUP,
                 confidence=0.3,
+                target_mode=RetrievalMode.LOCAL,
                 all_intents=[(Intent.FACT_LOOKUP, 0.3)]
             )
         
@@ -243,6 +271,9 @@ class IntentClassifier:
         primary_intent = sorted_intents[0][0]
         primary_score = sorted_intents[0][1]
         
+        # Map to retrieval mode
+        target_mode = self._map_mode(primary_intent)
+        
         # Add slight boost to primary if it has strong matches
         confidence = min(primary_score * 0.9 + 0.1, 1.0)
         
@@ -251,13 +282,14 @@ class IntentClassifier:
         
         # FR-021: Log route selection for observability and testability
         route_log = (
-            f"intent={primary_intent.value} confidence={confidence:.3f} "
-            f"candidates={len(sorted_intents)} query_len={len(query)}"
+            f"intent={primary_intent.value} mode={target_mode.value} "
+            f"confidence={confidence:.3f} candidates={len(sorted_intents)}"
         )
 
         return ClassificationResult(
             primary_intent=primary_intent,
             confidence=confidence,
+            target_mode=target_mode,
             all_intents=all_intents,
             route_log=route_log,
         )

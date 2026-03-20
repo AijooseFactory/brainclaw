@@ -12,7 +12,8 @@ export const ingestTool = {
     memory_class: Type.Optional(Type.String({ description: "Optional memory classification tag" })),
     metadata: Type.Optional(Type.Any({ description: "Optional metadata to store with the document" })),
     tenant_id: Type.Optional(Type.String({ description: "Optional tenant identifier" })),
-    agent_id: Type.Optional(Type.String({ description: "Optional agent identifier" }))
+    agent_id: Type.Optional(Type.String({ description: "Optional agent identifier" })),
+    sync: Type.Optional(Type.Boolean({ description: "If true, wait for ingestion to complete synchronously" }))
   }),
   async execute(_id: string, params: any, ctx: any) {
     const config = ctx.config || {};
@@ -23,7 +24,8 @@ export const ingestTool = {
         memory_class: params.memory_class || "general",
         metadata: params.metadata || {},
         tenant_id: params.tenant_id || "default",
-        agent_id: params.agent_id || "system"
+        agent_id: params.agent_id || "system",
+        sync: params.sync || false
       };
 
       // Call the ingestion pipeline in Python

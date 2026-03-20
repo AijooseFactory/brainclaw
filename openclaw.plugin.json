@@ -76,5 +76,64 @@
       "brainclaw memory sync"
     ]
   },
+  "tools": [
+    {
+      "name": "hybrid_graphrag_ingest",
+      "description": "Ingest a memory event into BrainClaw Hybrid GraphRAG (Vector + Graph).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "content": { "type": "string" },
+          "metadata": { "type": "object" },
+          "sync": { "type": "boolean", "description": "Wait for indexing to complete before returning." }
+        },
+        "required": ["content"]
+      }
+    },
+    {
+      "name": "hybrid_graphrag_retrieve",
+      "description": "Retrieve relevant memories from BrainClaw using Hybrid Search (Vector + BM25 + Graph).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "top_k": { "type": "integer" }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "hybrid_graphrag_leiden",
+      "description": "Run Leiden Community Detection on the BrainClaw Neo4j graph.",
+      "parameters": {
+          "type": "object",
+          "properties": {
+              "limit": { "type": "integer", "description": "Maximum number of communities to detect." }
+          }
+      }
+    },
+    {
+      "name": "lcm_expand",
+      "description": "Expand a query using the Lossless-Claw Memory (LCM) graph.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "depth": { "type": "integer", "default": 2 }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "lcm_describe",
+      "description": "Describe the current agent memory state based on LCM graph structure.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "agent_id": { "type": "string" }
+        }
+      }
+    }
+  ],
   "skills": ["./skills"]
 }

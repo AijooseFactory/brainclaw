@@ -798,6 +798,114 @@ class Neo4jClient:
             RETURN d
             ORDER BY d.created_at DESC
         """
+        async with self._driver.session(database=self.database) as session:
+            result = await session.run(query, tenant_id=str(tenant_id))
+            return [dict(record["d"]) for record in await result.all()]
+
+    async def run_leiden_detection(self, tenant_id: uuid.UUID) -> Dict[str, Any]:
+        """Run Leiden community detection with GDS and Python (cdlib) fallback.
+        
+        This implements the 'Meticulously Perfect' intelligence requirement,
+        ensuring communities are activated even on host Neo4j Desktop without GDS.
+        """
+        tenant_str = str(tenant_id)
+        
+        # 1. Attempt GDS version first (Meticulously Efficient)
+        try:
+            async with self._driver.session(database=self.database) as session:
+                # Check for GDS - wrap in try to catch ProcedureNotFound
+                try:
+                    check_gds = await session.run("CALL gds.list() YIELD name WHERE name = 'gds.leiden.write' RETURN name")
+                    if await check_gds.single():
+                        # GDS is available - use it
+                        project_name = f"graph-{tenant_str[:8]}"
+                        # Cleanup existing projection
+                        await session.run("CALL gds.graph.drop($name, false) YIELD graphName", name=project_name)
+                        # Project graph
+                        await session.run(
+                            "CALL gds.graph.project($name, ['Entity'], {HAS_RELATION: {properties: 'weight'}})",
+                            name=project_name
+                        )
+                        # Run Leiden
+                        result = await session.run(
+                            "CALL gds.leiden.write($name, {writeProperty: 'community_leiden', relationshipWeightProperty: 'weight'}) "
+                            "YIELD communityCount, modularity RETURN communityCount, modularity",
+                            name=project_name
+                        )
+                        record = await result.single()
+                        return {
+                            "mode": "gds",
+                            "status": "SUCCESS",
+                            "communityCount": record["communityCount"] if record else 0,
+                            "modularity": record["modularity"] if record else 0.0
+                        }
+                except Exception as inner_e:
+                    # Specific check for ProcedureNotFound or general failure
+                    if "ProcedureNotFound" in str(inner_e) or "not found" in str(inner_e).lower():
+                        logger.info("Neo4j GDS procedures not found. Moving to Python-native fallback.")
+                    else:
+                        logger.warning(f"GDS check failed with unexpected error: {inner_e}")
+                    # Fall through to Python fallback
+        except Exception as outer_e:
+            logger.warning(f"Neo4j Session failed during GDS check: {outer_e}")
+
+        # 2. Python Fallback (Universally Compatible Standard)
+        return await self._leiden_python_fallback(tenant_id)
+
+    async def _leiden_python_fallback(self, tenant_id: uuid.UUID) -> Dict[str, Any]:
+        """In-memory Leiden detection using networkx and cdlib."""
+        try:
+            import networkx as nx
+            from cdlib import algorithms
+        except ImportError:
+            return {"status": "ERROR", "message": "Python dependencies (networkx, cdlib) not found for fallback."}
+
+        tenant_str = str(tenant_id)
+        G = nx.Graph()
+
+        async with self._driver.session(database=self.database) as session:
+            # Fetch nodes
+            nodes = await session.run("MATCH (n:Entity {tenant_id: $tid}) RETURN n.id as id", tid=tenant_str)
+            node_ids = [r["id"] for r in (await nodes.data())]
+            G.add_nodes_from(node_ids)
+
+            # Fetch edges with weights (coalesce to float to satisfy leidenalg)
+            edges = await session.run(
+                "MATCH (n:Entity {tenant_id: $tid})-[r]->(m:Entity {tenant_id: $tid}) "
+                "RETURN n.id as start_id, m.id as end_id, coalesce(r.weight, 1.0) as weight",
+                tid=tenant_str
+            )
+            for r in (await edges.data()):
+                # Explicitly cast to float for networkx and leidenalg
+                G.add_edge(r["start_id"], r["end_id"], weight=float(r.get("weight", 1.0)))
+
+            if G.number_of_nodes() == 0:
+                return {"mode": "python-fallback", "status": "SUCCESS", "communityCount": 0, "modularity": 0.0}
+
+            # Run Leiden (cdlib)
+            # Use Leiden algorithm - robust for community detection
+            communities = algorithms.leiden(G, weights='weight')
+            
+            # Write back to Neo4j
+            write_batch = []
+            for i, community_nodes in enumerate(communities.communities):
+                for node_id in community_nodes:
+                    write_batch.append({"id": node_id, "cluster": i})
+            
+            # Execute write in transactions
+            batch_query = """
+            UNWIND $batch as item
+            MATCH (n:Entity {id: item.id})
+            SET n.community_leiden = item.cluster
+            """
+            await session.run(batch_query, batch=write_batch)
+
+            return {
+                "mode": "python-fallback",
+                "status": "SUCCESS",
+                "communityCount": len(communities.communities),
+                "modularity": communities.newman_girvan_modularity().score if hasattr(communities, 'newman_girvan_modularity') else 0.0
+            }
         
         async with self._driver.session(database=self.database) as session:
             result = await session.run(query, tenant_id=str(tenant_id))
@@ -1008,6 +1116,35 @@ class Neo4jClient:
             result = await session.run(query, id=str(node_id))
             return True
     
+    async def get_graph_health(self, tenant_id: uuid.UUID) -> Dict[str, Any]:
+        """Get summarized graph health metrics for a tenant."""
+        tenant_str = str(tenant_id)
+        
+        async with self._driver.session(database=self.database) as session:
+            # Count nodes and edges for this tenant
+            node_query = "MATCH (n {tenant_id: $tenant_id}) RETURN count(n) as node_count"
+            edge_query = "MATCH (n {tenant_id: $tenant_id})-[r]->(m {tenant_id: $tenant_id}) RETURN count(r) as edge_count"
+            
+            # Count community property
+            community_query = "MATCH (n {tenant_id: $tenant_id}) WHERE n.community_leiden IS NOT NULL RETURN count(DISTINCT n.community_leiden) as community_count"
+            
+            node_result = await session.run(node_query, tenant_id=tenant_str)
+            edge_result = await session.run(edge_query, tenant_id=tenant_str)
+            community_result = await session.run(community_query, tenant_id=tenant_str)
+            
+            node_count = (await node_result.single())["node_count"]
+            edge_count = (await edge_result.single())["edge_count"]
+            community_count = (await community_result.single())["community_count"]
+            
+            return {
+                "status": "healthy",
+                "nodes": node_count,
+                "edges": edge_count,
+                "communities": community_count,
+                "tenant_id": tenant_str
+            }
+
+
     @traced_async("neo4j.query", {"component": "storage"})
     async def execute_cypher(self, query: str, parameters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Execute a raw Cypher query."""

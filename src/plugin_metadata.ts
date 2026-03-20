@@ -1,11 +1,12 @@
 export const BRAINCLAW_PLUGIN_ID = "brainclaw";
-export const BRAINCLAW_VERSION = "1.3.0";
+export const BRAINCLAW_VERSION = "1.5.0-perfect";
 
 export const BRAINCLAW_FEATURES = [
   "memory-search",
   "memory-get",
   "search",
   "ingest",
+  "sync-ingest",
   "graph-health",
   "contradiction",
   "lossless-claw-integration",
@@ -17,4 +18,9 @@ export const BRAINCLAW_FEATURES = [
   "audit-logger",
   "entity-extractor",
   "contradiction-detector",
+  "weaviate-bq",
+  "postgres-fts-bm25",
+  "leiden-detection",
+  "lcm-expand",
+  "lcm-describe",
 ];

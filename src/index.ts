@@ -14,6 +14,9 @@ import { registerMemoryFileWatcherService } from "./services/memory_file_watcher
 import { registerPromptRecallHook } from "./hooks/prompt_recall.js";
 import { registerBootstrapFilterHook } from "./hooks/bootstrap_filter.js";
 import { registerAgentEndCaptureHook } from "./hooks/agent_end_capture.js";
+import { registerLcmExpandTool } from "./tools/lcm_expand.js";
+import { registerLcmDescribeTool } from "./tools/lcm_describe.js";
+import { registerLeidenDetectionTool } from "./tools/leiden_detection.js";
 import { initLogger } from "./logging.js";
 import { BRAINCLAW_FEATURES, BRAINCLAW_VERSION } from "./plugin_metadata.js";
 import { registerBrainclawCli } from "./register_cli.js";
@@ -44,6 +47,9 @@ export default function hybridGraphRagPlugin(api: any) {
   registerPromptRecallHook(api);
   registerAgentEndCaptureHook(api);
   registerBootstrapFilterHook(api);
+  registerLcmExpandTool(api);
+  registerLcmDescribeTool(api);
+  registerLeidenDetectionTool(api);
 
   // 2. Register Background Services
   registerSummarizerService(api);

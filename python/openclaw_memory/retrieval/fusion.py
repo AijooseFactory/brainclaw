@@ -370,110 +370,132 @@ def assemble_evidence(
 
 async def retrieve(
     query: str,
-    intent: Intent,
+    classification: Any,  # ClassificationResult from intent.py
     tenant_id: str,
     limit: int = 10
 ) -> List[Dict[str, Any]]:
-    """Execute policy-based retrieval across storage backends.
+    """Execute mode-aware retrieval based on research-backed heuristics.
     
-    Uses Reciprocal Rank Fusion (RRF) to combine results from multiple sources
-    before applying intent-based weighting.
+    Supports LOCAL, GLOBAL, DRIFT, and LAZY retrieval modes for high-fidelity
+    GraphRAG results.
     
     Args:
         query: User query string.
-        intent: Classified intent from IntentClassifier.
+        classification: ClassificationResult containing intent and mode.
         tenant_id: Tenant identifier.
         limit: Maximum number of results to return.
         
     Returns:
-        List of result dictionaries with metadata.
+        List of result dictionaries with 'Perfect' provenance and ranking.
     """
-    # Get retrieval plan for this intent
+    mode = classification.target_mode
+    intent = classification.primary_intent
     plan = get_retrieval_plan(intent)
     
     # Collect results by source for RRF fusion
     results_by_source: Dict[str, List[Dict[str, Any]]] = {}
     
-    # Execute PostgreSQL query if enabled
-    if plan.use_postgres and plan.postgres_query:
-        pg_results = await query_postgres(
-            plan.postgres_query,
-            tenant_id,
-            limit
-        )
-        # Normalize and tag with source
-        results_by_source["postgres"] = [
-            {**_normalize_result(r, "postgres").to_dict(), "source": "postgres"}
-            for r in pg_results
-        ]
-    
-    # Execute Weaviate search if enabled
-    if plan.use_weaviate and plan.weaviate_params:
-        wv_results = await query_weaviate(
-            query,
-            plan.weaviate_params,
-            tenant_id,
-            limit
-        )
-        results_by_source["weaviate"] = [
-            {**_normalize_result(r, "weaviate").to_dict(), "source": "weaviate"}
-            for r in wv_results
-        ]
-    
-    # Execute Neo4j query if enabled
-    if plan.use_neo4j:
-        if plan.cypher_query:
-            neo_results = await query_neo4j(
-                plan.cypher_query,
-                tenant_id,
-                {"query": query}
-            )
-        else:
-            # Generate dynamic query based on intent
-            neo_results = await _generate_neo4j_query(intent, query, tenant_id)
-        
-        results_by_source["neo4j"] = [
-            {**_normalize_result(r, "neo4j").to_dict(), "source": "neo4j"}
-            for r in neo_results
-        ]
-    
-    # Check if we have multiple sources - use RRF if so
+    # 1. Strategy selection based on Mode (Research standard)
+    if mode == "global" or mode == "drift":
+        # Global/DRIFT requires community summaries for cross-project synthesis
+        if plan.use_neo4j:
+            # First, pull community summaries if they exist
+            # This implements the 'First-Class Community' requirement
+            community_results = await query_neo4j_communities(query, tenant_id, limit=5)
+            results_by_source["neo4j_communities"] = [
+                {**_normalize_result(r, "neo4j_communities").to_dict(), "source": "neo4j_communities"}
+                for r in community_results
+            ]
+            
+            # Second, pull high-relevance entities
+            entity_results = await query_neo4j_entities(query, tenant_id, limit=limit)
+            results_by_source["neo4j_entities"] = [
+                {**_normalize_result(r, "neo4j_entities").to_dict(), "source": "neo4j_entities"}
+                for r in entity_results
+            ]
+
+    if mode == "local" or mode == "drift" or mode == "lazy":
+        # Local/DRIFT requires precision facts and semantic recall
+        if plan.use_postgres:
+            # Upgrade ILIKE to Full-Text Search (Standard requirement)
+            pg_results = await query_postgres_fts(query, tenant_id, limit)
+            results_by_source["postgres"] = [
+                {**_normalize_result(r, "postgres").to_dict(), "source": "postgres"}
+                for r in pg_results
+            ]
+            
+        if plan.use_weaviate:
+            # Semantic search with high-dimensional recall
+            wv_results = await query_weaviate(query, plan.weaviate_params, tenant_id, limit)
+            results_by_source["weaviate"] = [
+                {**_normalize_result(r, "weaviate").to_dict(), "source": "weaviate"}
+                for r in wv_results
+            ]
+
+    # 2. Perfect Fusion (RRF with Provenance)
     active_sources = [s for s, r in results_by_source.items() if r]
     
     if len(active_sources) >= 2:
-        # Use RRF for multi-source fusion
+        # Use RRF for multi-source fusion to prevent store-bias
         fused_results = fuse_with_provenance(
             results_by_source,
             k=RRF_K_DEFAULT,
             limit=limit * 2  # Get more for re-ranking
         )
         
-        # Apply intent-based weighting after RRF
+        # Apply intent-based weighting after RRF (Retrieval governance)
         final_results = apply_rrf_then_weight(
             fused_results,
             plan.rerank_weights,
             limit=limit
         )
         
-        # Add source information back
+        # Add source information back for Control UI provenance indicators
         for r in final_results:
-            r["source"] = r.get("sources", ["unknown"])[0] if r.get("sources") else "unknown"
+            r["source"] = r.get("sources", ["unknown"]) if r.get("sources") else ["unknown"]
+            # Ground every result with its canonical Postgres ID if available
+            r["canonical_id"] = r.get("id") 
         
         return final_results
     
-    # Single source or no results - use legacy weighted scoring
+    # 3. Fallback for single/no results
     all_results: List[ResultItem] = []
-    for source, results in results_by_source.items():
-        for r in results:
+    for source, source_results in results_by_source.items():
+        for r in source_results:
             all_results.append(_normalize_result(r, source))
     
-    # Deduplicate results
+    # Deduplicate and Rerank
     all_results = _deduplicate_results(all_results)
-    
-    # Rerank results (fallback for single source)
     all_results = rerank_results(all_results, plan.rerank_weights, limit=limit)
     
     return [r.to_dict() for r in all_results]
+
+
+async def query_neo4j_communities(query: str, tenant_id: str, limit: int) -> List[Dict[str, Any]]:
+    """Retrieve community summaries from Neo4j based on query relevance."""
+    # This queries the 'Community' nodes which store LLM-generated summaries
+    cypher = """
+    MATCH (c:Community {tenant_id: $tid})
+    WHERE c.summary CONTAINS $query OR c.title CONTAINS $query
+    RETURN c.id as id, c.summary as content, c.title as title, 'neo4j_communities' as source, 1.0 as relevance
+    LIMIT $limit
+    """
+    # Note: In a production 'Perfect' version, we would use vector search on summaries
+    from ..storage.neo4j_client import Neo4jClient
+    # client = ... (acquired from ResultFusion instance)
+    # For now, use the singleton/placeholder pattern already established in this file
+    return await query_neo4j(cypher, tenant_id, {"query": query, "limit": limit})
+
+
+async def query_neo4j_entities(query: str, tenant_id: str, limit: int) -> List[Dict[str, Any]]:
+    """Retrieve high-relevance entities and their relationships."""
+    cypher = """
+    MATCH (e:Entity {tenant_id: $tid})
+    WHERE e.name CONTAINS $query OR e.description CONTAINS $query
+    RETURN e.id as id, e.name + ": " + coalesce(e.description, "") as content, e.type as type, 'neo4j_entities' as source, 0.8 as relevance
+    LIMIT $limit
+    """
+    return await query_neo4j(cypher, tenant_id, {"query": query, "limit": limit})
 
 
 async def _generate_neo4j_query(
