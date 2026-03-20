@@ -23,7 +23,8 @@ Everything else feeds or derives from that canonical layer.
 - Graph health inspection and contradiction review
 - Background entity extraction, summarization, audit logging, and contradiction detection
 - Operational memory sync for root and agent `MEMORY.md` state blocks
-- CLI surfaces for memory sync, rebuilds, and Lossless-Claw integration operations
+- Automatic Lossless-Claw detection, compatibility gating, and artifact integration
+- CLI surfaces for memory sync, rebuilds, and Lossless-Claw installation/ops
 
 ## Architecture
 

@@ -135,13 +135,17 @@ The integration directory (`python/openclaw_memory/integration/`) contains:
 
 - `source_adapter.py`, `artifact_validation.py`, `lcm_migration.py`, `lossless_adapter.py`, `lossless_sync.py`, `memory_backup.py`, `openclaw_client.py`, `operational_memory_sync.py`, `operations.py`, `promotion_override.py`, `session_context.py`, `sync_error_handling.py`.
 
-### Unified Memory Index (v1.5.0-intel)
+### Factual Memory Metrics (v1.5.0-intel)
 
-BrainClaw now provides a **Unified Index** (formerly "Total") which aggregates all canonical memory items in PostgreSQL (760+ items).
+BrainClaw provides a definitively reconciled memory dashboard:
 
-- **Granular Breakdown**: Hovering over the index in the BrainClaw Memory tab reveals the exact distribution of memory classes (`identity`, `semantic`, `relational`, `knowledge`, `episodic`).
-- **Global Stats**: "Knowledge" and "Conversation" metrics are now **agent-wide (global)** counts, ensuring dashboard stability regardless of search filters.
-- **UI Patching**: Due to cross-project resolution rules in the production container, UI changes are surgically patched into `/app/dist/control-ui/assets/agents-BAnlakjV.js` using the `/tmp/patch_ui.py` script.
+- **BrainClaw Memory**: Unified total of all HybridGraph items (e.g., **762**).
+- **Lossless Memories**: Active session context detected via Lossless-Claw (e.g., **9**).
+- **Agent's Knowledge**: Stable archive of synthesized factual wisdom (e.g., **761**).
+- **Self-learning Entries**: Stable archive of episodic chat traces (e.g., **1**).
+- **Reconciliation Logic**: BrainClaw Memory = Agent's Knowledge + Self-learning Entries.
+- **Granular Breakdown**: Hovering over BrainClaw Memory reveals the exact distribution (`identity`, `semantic`, `relational`, `knowledge`, `episodic`).
+- **Global Alignment**: "Knowledge" and "Conversation" metrics are now **agent-wide (global)** counts.
 
 ## Runtime Verification
 
