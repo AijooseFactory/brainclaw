@@ -56,13 +56,16 @@ The BrainClaw TypeScript source is under `src/` and currently includes:
   - `src/validation.ts`
   - `src/logging.ts`
   - `src/sanitization.ts`
-- tools:
+- tools (`src/tools/`):
   - `search`
   - `memory_search`
   - `memory_get`
   - `ingest`
   - `graph_health`
   - `contradiction_check`
+  - `leiden_detection` (v1.5.0)
+  - `lcm_expand` (v1.5.0)
+  - `lcm_describe` (v1.5.0)
 - hooks:
   - `prompt_recall`
   - `bootstrap_filter`
@@ -75,8 +78,6 @@ The BrainClaw TypeScript source is under `src/` and currently includes:
   - `lossless_claw_integration`
   - `operational_memory_sync`
   - `memory_file_watcher`
-
-These are actually present in the repo. Do not claim they are missing without checking the BrainClaw repo path above.
 
 ### Core UI & Gateway Overrides
 
@@ -91,8 +92,6 @@ BrainClaw carries 20 in-progress UI/Gateway overrides in the `core-ui-overrides/
   - `views/agents-panels-status-files.ts`: Optimized MEMORY.md file list removal.
   - `views/agents.ts`: Tab navigation registration for `Memory`.
 
-These are currently localized within the plugin repo to ensure full-stack sync. In production, they are intended to be applied as a sync-overlay to the OpenClaw core `/app` directory.
-
 ### Bidirectional Sync Architecture (MEMORY.md ↔ DB)
 
 BrainClaw keeps each agent's `MEMORY.md` and the canonical Postgres memory in sync bidirectionally. `MEMORY.md` is the backup mirror — if the DB is lost, memory can be restored from the file.
@@ -105,71 +104,37 @@ BrainClaw keeps each agent's `MEMORY.md` and the canonical Postgres memory in sy
 | MEMORY.md → DB | User saves MEMORY.md in Control UI | `agents.files.set` → `syncAgentBrainClawMemoryBackup` → `sync_memory_md_backup` |
 | MEMORY.md → DB | External edit (VS Code, agent, script) | `memory_file_watcher` service → `sync_memory_md_backup` |
 
-The file watcher uses `fs.watchFile` (stat polling, 2s default interval) with SHA-256 content deduplication to detect external edits. It can be disabled via `memoryFileWatcherEnabled: false` in plugin config.
-
-### Shipped BrainClaw skill
-
-BrainClaw currently ships one generic plugin skill under:
-
-- `skills/memory-data-engineer/SKILL.md`
-
-That skill is intentionally generic and should surface in OpenClaw as `memory-data-engineer`, not `lore`.
-Lore may use the skill, but Lore is the agent identity, not the skill name.
+The `sync_memory_md_backup` logic is central to the bridge entrypoints in `python/openclaw_memory/bridge_entrypoints.py`.
 
 ### Python backend
 
 The Python backend lives under `python/openclaw_memory` and currently includes:
 
 - storage clients:
-  - PostgreSQL
-  - Neo4j
-  - Weaviate
+  - PostgreSQL (`postgres.py`)
+  - Neo4j (`neo4j_client.py` - includes Python-native Leiden fallback)
+  - Weaviate (`weaviate_client.py`)
 - pipeline modules:
-  - ingestion
-  - chunking
-  - extraction
-  - llm_extraction
-  - redaction
-  - sync
+  - ingestion, chunking, extraction, redaction, and sync.
 - retrieval modules:
-  - fusion
-  - rrf_fusion
-  - intent
-  - policy
-  - drill_down
+  - fusion (Mode-aware hub: GLOBAL, DRIFT, LOCAL, LAZY)
+  - rrf_fusion, intent, policy, drill_down.
 - graph modules:
-  - health
-  - communities
-  - summarize
-- memory modules:
-  - classes
-  - lifecycle
-  - write_policy
+  - health, communities, summarize.
+- learning modules (v1.5.0):
+  - active_learning, auto_summarize.
+- migration modules (v1.5.0):
+  - orchestrator, lcm_export.
 - observability modules:
-  - logging
-  - metrics
-  - telemetry
-  - lcm_metrics
+  - logging, metrics, telemetry, lcm_metrics.
 - security modules:
-  - access_control
-  - team_lookup
+  - access_control, team_lookup.
 
 ### Integration layer
 
-The integration directory does exist and currently contains:
+The integration directory (`python/openclaw_memory/integration/`) contains:
 
-- `python/openclaw_memory/integration/source_adapter.py`
-- `python/openclaw_memory/integration/artifact_validation.py`
-- `python/openclaw_memory/integration/lcm_migration.py`
-- `python/openclaw_memory/integration/lossless_adapter.py`
-- `python/openclaw_memory/integration/lossless_sync.py`
-- `python/openclaw_memory/integration/memory_backup.py`
-- `python/openclaw_memory/integration/openclaw_client.py`
-- `python/openclaw_memory/integration/operational_memory_sync.py`
-- `python/openclaw_memory/integration/operations.py`
-- `python/openclaw_memory/integration/promotion_override.py`
-- `python/openclaw_memory/integration/session_context.py`
-- `python/openclaw_memory/integration/sync_error_handling.py`
+- `source_adapter.py`, `artifact_validation.py`, `lcm_migration.py`, `lossless_adapter.py`, `lossless_sync.py`, `memory_backup.py`, `openclaw_client.py`, `operational_memory_sync.py`, `operations.py`, `promotion_override.py`, `session_context.py`, `sync_error_handling.py`.
 
 ## Runtime Verification
 
