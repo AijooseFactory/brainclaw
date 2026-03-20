@@ -65,13 +65,13 @@ Primary implementation files for this feature:
 - [`python/openclaw_memory/integration/lossless_sync.py`](./python/openclaw_memory/integration/lossless_sync.py)
 - [`specs/001-authoritative-memory-backend/data-model.md`](./specs/001-authoritative-memory-backend/data-model.md)
 
-## Recent Release: v1.5.0-perfect
-
-The **'Meticulously Perfect'** release landed on `main` in:
-
-- [`5db43b1`](https://github.com/AijooseFactory/brainclaw/commit/5db43b1c6762391621287965c82dd2eaf16) `feat: BrainClaw v1.5.0-perfect - Universal Leiden Fallback & Mode-Aware Retrieval`
-
-This release ensures 100% architectural alignment with the Perfect GraphRAG standard, delivering active community intelligence regardless of GDS availability.
+## Recent Release: v1.5.0
+ 
+The **v1.5.0** release landed on `main` in:
+ 
+- [`5db43b1`](https://github.com/AijooseFactory/brainclaw/commit/5db43b1c6762391621287965c82dd2eaf16) `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
+ 
+This release ensures architectural alignment with GraphRAG standards, delivering active community intelligence regardless of GDS availability.
 
 ## Runtime Compatibility
 

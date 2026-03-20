@@ -33,7 +33,7 @@ If a report mixes those values together, the report is wrong.
 
 Current `main` history relevant to continuation work:
 
-- `5db43b1` `feat: BrainClaw v1.5.0-perfect - Universal Leiden Fallback & Mode-Aware Retrieval`
+- `5db43b1` `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
 - `d72397e` `docs: finalize HANDOFF.md with full-stack sync details`
 - `92e7cc0` `feat: fold in-progress Control UI and Gateway overrides for BrainClaw`
 - `2930d55` `feat: bidirectional MEMORY.md ↔ DB sync with file watcher`
@@ -146,7 +146,7 @@ Command run:
 
 Verified runtime facts:
 
-- BrainClaw plugin initialized as version `1.5.0-perfect`
+- BrainClaw plugin initialized as version `1.5.0`
 - Lossless-Claw compatibility state: `not_installed` (runtime check passed, but DB not found in this env)
 - Lossless-Claw plugin version: `0.4.0`
 - OpenClaw runtime version: `2026.3.14`

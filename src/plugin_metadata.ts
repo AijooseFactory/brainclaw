@@ -1,5 +1,5 @@
 export const BRAINCLAW_PLUGIN_ID = "brainclaw";
-export const BRAINCLAW_VERSION = "1.5.0-perfect";
+export const BRAINCLAW_VERSION = "1.5.0";
 
 export const BRAINCLAW_FEATURES = [
   "memory-search",
