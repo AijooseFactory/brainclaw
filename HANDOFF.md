@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-19
 > Repo branch: `main`
-> Latest commit: `92e7cc0`
+> Latest commit: `1cde90b`
 > Live OpenClaw mount: `./brainclaw-sync -> /home/node/.openclaw/extensions/brainclaw`
 
 ## Read This First
@@ -24,7 +24,7 @@ Do not inspect `/app/src` or `/app/package.json` and assume those files describe
 These three version numbers refer to different systems:
 
 - OpenClaw runtime version: `2026.3.14`
-- BrainClaw plugin/package version: `1.5.0-perfect`
+- BrainClaw plugin/package version: `1.5.0`
 - Lossless-Claw plugin version: `0.4.0`
 
 If a report mixes those values together, the report is wrong.
@@ -33,6 +33,7 @@ If a report mixes those values together, the report is wrong.
 
 Current `main` history relevant to continuation work:
 
+- `1cde90b` `feat: BrainClaw v1.5.0-intel - Continual Intelligence & Knowledge Distillation`
 - `5db43b1` `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
 - `d72397e` `docs: finalize HANDOFF.md with full-stack sync details`
 - `92e7cc0` `feat: fold in-progress Control UI and Gateway overrides for BrainClaw`
@@ -66,6 +67,7 @@ The BrainClaw TypeScript source is under `src/` and currently includes:
   - `leiden_detection` (v1.5.0)
   - `lcm_expand` (v1.5.0)
   - `lcm_describe` (v1.5.0)
+  - `intel_distill` (v1.5.0-intel)
 - hooks:
   - `prompt_recall`
   - `bootstrap_filter`
@@ -78,6 +80,7 @@ The BrainClaw TypeScript source is under `src/` and currently includes:
   - `lossless_claw_integration`
   - `operational_memory_sync`
   - `memory_file_watcher`
+  - `intelligence` (v1.5.0-intel)
 
 ### Core UI & Gateway Overrides
 
@@ -122,7 +125,7 @@ The Python backend lives under `python/openclaw_memory` and currently includes:
 - graph modules:
   - health, communities, summarize.
 - learning modules (v1.5.0):
-  - active_learning, auto_summarize.
+  - active_learning, auto_summarize, distiller (v1.5.0-intel).
 - migration modules (v1.5.0):
   - orchestrator, lcm_export.
 - observability modules:
@@ -156,6 +159,7 @@ Verified runtime facts:
   - `lcm_grep`
   - `lcm_describe`
   - `lcm_expand`
+  - `intel_distill` (Phase 12)
   - `hybrid_graphrag_leiden`
   - `hybrid_graphrag_retrieve`
 

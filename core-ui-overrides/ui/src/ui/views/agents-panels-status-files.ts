@@ -877,19 +877,19 @@ function renderBrainClawMemoryManager(params: {
         </div>
       </section>
       <div class="stat-grid" style="margin-top: 16px;">
-        <div class="stat">
+        <div class="stat" title="Total unique memory items archived for this agent in the canonical PostgreSQL store.">
           <div class="stat-label">Total</div>
           <div class="stat-value">${list?.total ?? "—"}</div>
         </div>
-        <div class="stat">
+        <div class="stat" title="Number of memories matching your current search query, area selection, and confidence threshold.">
           <div class="stat-label">Filtered</div>
           <div class="stat-value">${list?.filtered ?? "—"}</div>
         </div>
-        <div class="stat">
+        <div class="stat" title="High-fidelity synthesized wisdom, facts, and relational items (Long-term memory).">
           <div class="stat-label">Knowledge</div>
           <div class="stat-value">${list?.knowledge ?? "—"}</div>
         </div>
-        <div class="stat">
+        <div class="stat" title="Episodic chat history and session summaries (Short-term memory).">
           <div class="stat-label">Conversation</div>
           <div class="stat-value">${list?.conversation ?? "—"}</div>
         </div>

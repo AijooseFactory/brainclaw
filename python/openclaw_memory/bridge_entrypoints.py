@@ -1794,7 +1794,7 @@ def list_memories(
         current_clause = "" if include_superseded else " AND is_current = TRUE"
         total_params = [str(canonical_agent_uuid)]
         total_query = f"""
-            SELECT COUNT(*)
+            SELECT COUNT(*) AS count
             FROM memory_items
             WHERE agent_id::text = %s
             {current_clause}
