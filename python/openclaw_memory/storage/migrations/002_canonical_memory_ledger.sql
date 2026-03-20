@@ -41,7 +41,7 @@ ALTER TABLE memory_items
     ADD COLUMN IF NOT EXISTS extractor_name TEXT NOT NULL DEFAULT 'brainclaw';
 
 ALTER TABLE memory_items
-    ADD COLUMN IF NOT EXISTS extractor_version TEXT NOT NULL DEFAULT '1.3.0';
+    ADD COLUMN IF NOT EXISTS extractor_version TEXT NOT NULL DEFAULT '1.5.0-intel-perfection';
 
 ALTER TABLE memory_items
     ADD COLUMN IF NOT EXISTS extraction_confidence DOUBLE PRECISION;

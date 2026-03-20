@@ -551,7 +551,7 @@ class PostgresClient:
                         $2, source_message_id, source_session_id,
                         source_tool_call_id, extracted_by, extraction_method,
                         NOW(), COALESCE(extractor_name, extracted_by, 'brainclaw'),
-                        COALESCE(extractor_version, '1.3.0'),
+                        COALESCE(extractor_version, '1.5.0-intel-perfection'),
                         extraction_confidence, COALESCE(extraction_metadata, '{}'::jsonb),
                         COALESCE($3, confidence), user_confirmed,
                         user_confirmed_at, user_confirmed_by, NOW(), NULL,

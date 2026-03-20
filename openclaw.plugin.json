@@ -1,5 +1,6 @@
 {
   "id": "brainclaw",
+  "version": "1.5.0-intel-perfection",
   "kind": "memory",
   "configSchema": {
     "type": "object",

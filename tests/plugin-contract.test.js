@@ -233,7 +233,7 @@ test("BrainClaw prompt recall injects a live status snapshot for health prompts"
     "Expected a deterministic BrainClaw status snapshot for health prompts"
   );
   assert.ok(
-    result.prependContext.includes("Plugin: brainclaw v1.3.0"),
+    result.prependContext.includes("Plugin: brainclaw v1.5.0-intel-perfection"),
     "Expected the live status snapshot to include plugin version"
   );
   assert.ok(

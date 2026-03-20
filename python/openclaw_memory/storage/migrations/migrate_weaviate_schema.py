@@ -17,7 +17,7 @@ COLLECTIONS = ["MemoryChunk", "Entity", "Decision", "Pattern", "EpisodicEvent"]
 AGENT_ID_PROPERTY = {
     "name": "agent_id",
     "dataType": ["uuid"],
-    "description": "Agent that owns this record (v1.3.0 multi-agent isolation)",
+    "description": "Agent that owns this record (v1.5.0-intel-perfection multi-agent isolation)",
     "indexSearchable": False,
     "indexFilterable": True,
 }
@@ -92,7 +92,7 @@ def add_agent_id_property(client, collection_name: str, dry_run: bool = False):
             wc.Property(
                 name="agent_id",
                 data_type=wc.DataType.UUID,
-                description="Agent that owns this record (v1.3.0 isolation)",
+                description="Agent that owns this record (v1.5.0-intel-perfection isolation)",
                 index_searchable=False,
                 index_filterable=True,
             )
