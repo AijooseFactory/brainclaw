@@ -12,6 +12,8 @@ All functions here are:
 import os
 import asyncio
 import json
+import math
+from typing import List, Dict, Any, Optional
 import hashlib
 import logging
 import uuid
@@ -1204,10 +1206,16 @@ def ingest_event(event: dict = None, **kwargs) -> dict:
             role=role,
             metadata=metadata,
         )
+        
+        # Perfection Pass (v1.5.0-intel): Enhanced Extraction for better graph connectivity
+        from openclaw_memory.pipeline.extraction import extract_all
+        extraction = extract_all(content)
+        
         user_confirmed = bool(
             metadata.get("user_confirmed")
             or metadata.get("remember_this")
             or metadata.get("memory_class") not in {None, "", "general", "unknown"}
+            or extraction.relationships # If relations found, it's structurally important
         )
         should_promote = (
             (inferred["memory_class"] != "episodic" and user_confirmed)
@@ -2426,6 +2434,46 @@ def intel_record_promotion(count: int = 1, **kwargs) -> dict:
         return {"error": str(e)}
 
 
+def optimize_memory(days_to_prune: int = 30, **kwargs) -> dict:
+    """Perfection Pass (v1.5.0-intel): Optimize memory, prune stale data, and refresh graph."""
+    try:
+        from openclaw_memory.storage.postgres import PostgresClient
+        from openclaw_memory.storage.neo4j_client import Neo4jClient
+        from openclaw_memory.graph.communities import CommunityDetector
+        from openclaw_memory.pipeline.maintenance import MemoryMaintenance
+        
+        pg_params = _parse_postgres_url(_postgres_url())
+        pg = PostgresClient(**pg_params)
+        maint = MemoryMaintenance(pg)
+        
+        # 1. Prune
+        prune_res = _run_async(maint.prune_superseded(days_old=days_to_prune))
+        
+        # 2. Communities
+        neo_url = os.getenv("NEO4J_URL", f"bolt://{os.getenv('NEO4J_HOST', 'neo4j')}:7687")
+        neo_user = os.getenv("NEO4J_USER", "neo4j")
+        neo_pass = os.getenv("NEO4J_PASSWORD", "")
+        neo_db = os.getenv("NEO4J_DATABASE", "neo4j")
+        
+        neo = Neo4jClient(uri=neo_url, user=neo_user, password=neo_pass, database=neo_db)
+        _run_async(neo.connect())
+        try:
+            detector = CommunityDetector(neo4j_client=neo)
+            comm_res = _run_async(detector.detect_communities())
+        finally:
+            _run_async(neo.disconnect())
+        
+        return {
+            "status": "success",
+            "pruned": prune_res.get("pruned_count", 0),
+            "communities": comm_res.get("community_count", 0),
+            "version": "1.5.0-intel-perfection"
+        }
+    except Exception as e:
+        logger.error(f"Memory optimization failed: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 if __name__ == "__main__":
     import sys
     import json
@@ -2458,6 +2506,7 @@ if __name__ == "__main__":
         "classify": classify,
         "intel_distill": intel_distill,
         "intel_record_promotion": intel_record_promotion,
+        "optimize_memory": optimize_memory,
     }
 
     if func_name in dispatch:

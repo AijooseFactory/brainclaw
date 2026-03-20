@@ -651,10 +651,17 @@ def extract_all(text: str, method: str = "rule") -> ExtractionResult:
     entities = extract_entities(text, method)
     relationships = extract_relationships(text, entities)
     
-    return ExtractionResult(
+    result = ExtractionResult(
         entities=entities,
         relationships=relationships,
     )
+    
+    # Apply Perfection-Pass Enhancement (v1.5.0-intel)
+    from .enhancement import RelationshipEnhancer
+    enhancer = RelationshipEnhancer()
+    result = enhancer.enhance(text, result)
+    
+    return result
 
 
 # Alias for backwards compatibility

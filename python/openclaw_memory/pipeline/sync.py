@@ -296,6 +296,13 @@ async def sync_memory_item(
         status.neo4j_synced = True
         status.neo4j_synced_at = datetime.utcnow()
     
+    # Fallback/Self-Healing logic:
+    # If one of the stores failed persistently, we record the error and allow the system 
+    # to retry during the next maintenance cycle.
+    if not wv_id or not neo_synced:
+        status.error = f"SelfHealing: Partial sync failure. Weaviate: {bool(wv_id)}, Neo4j: {neo_synced}"
+        logger.warning(status.error)
+
     # Update sync status in PostgreSQL
     await postgres_client.update_sync_status(
         memory_item.id,

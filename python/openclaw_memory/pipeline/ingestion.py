@@ -186,8 +186,12 @@ class WritePolicy:
         Returns:
             True if should be promoted to active memory
         """
-        # Phase 12 Refinement: Block promotion if contradictions detected (unless user confirmed)
-        if contradiction_detected and not user_confirmed:
+        # Phase 12 Refined Perfection (v1.5.0-intel): Temporal Authority
+        # Automatically approve contradictions if they are newer 'summaries', 'reports', or 'corrections'.
+        if contradiction_detected:
+            if memory_type in ["summary", "report", "correction"] or user_confirmed:
+                logger.info(f"Temporal Authority: Auto-approving contradiction resolution for {memory_type}")
+                return True
             logger.warning(f"Blocking promotion due to contradiction: {content[:50]}...")
             return False
 
