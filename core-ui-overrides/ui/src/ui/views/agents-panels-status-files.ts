@@ -907,7 +907,7 @@ function renderBrainClawMemoryManager(params: {
           class="stat"
           title="Conversation History (Traces): Total agent-wide episodic chat messages and session summaries. These are the short-term 'Tracks' left by your agent across all sessions."
         >
-          <div class="stat-label">Conversation</div>
+          <div class="stat-label">Conversations</div>
           <div class="stat-value">${list?.conversation ?? "—"}</div>
         </div>
       </div>
