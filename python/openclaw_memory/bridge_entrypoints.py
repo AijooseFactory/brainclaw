@@ -1832,6 +1832,11 @@ def list_memories(
                 ) AS conversation
             {filter_query}
         """
+        breakdown_query = f"""
+            SELECT COALESCE(memory_class, 'semantic') as class, COUNT(*) as count
+            {filter_query}
+            GROUP BY 1
+        """
         items_query = f"""
             SELECT id, tenant_id, agent_id, memory_class, memory_type, status,
                    content, metadata, source_message_id, source_session_id,
@@ -1856,6 +1861,9 @@ def list_memories(
         filtered = int(counts.get("filtered") or 0)
         knowledge = int(counts.get("knowledge") or 0)
         conversation = int(counts.get("conversation") or 0)
+
+        cur.execute(breakdown_query, filter_params)
+        breakdown = {row["class"]: int(row["count"]) for row in cur.fetchall()}
 
         cur.execute(items_query, item_params)
         rows = [dict(row) for row in cur.fetchall()]
@@ -1887,6 +1895,7 @@ def list_memories(
             "filtered": filtered,
             "knowledge": knowledge,
             "conversation": conversation,
+            "breakdown": breakdown,
             "page": normalized_page,
             "pageSize": normalized_limit,
             "pageCount": math.ceil(filtered / normalized_limit) if filtered else 0,

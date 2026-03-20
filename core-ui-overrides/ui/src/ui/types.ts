@@ -385,6 +385,7 @@ export type AgentsBrainClawMemoryListResult = {
   page: number;
   pageSize: number;
   pageCount: number;
+  breakdown?: Record<string, number>;
   items: AgentsBrainClawMemoryRecord[];
 };
 

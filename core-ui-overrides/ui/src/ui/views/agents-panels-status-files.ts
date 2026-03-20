@@ -11,6 +11,7 @@ import {
 } from "../presenter.ts";
 import type {
   AgentFileEntry,
+  AgentsBrainClawMemoryListResult,
   AgentsBrainClawMemoryRecord,
   AgentsFilesListResult,
   ChannelAccountSnapshot,
@@ -367,7 +368,7 @@ export function renderAgentMemory(params: {
     view: "file" | "brainclaw";
     listLoading: boolean;
     listError: string | null;
-    list: {
+    list: AgentsBrainClawMemoryListResult | null; /*
       agentId: string;
       total: number;
       filtered: number;
@@ -377,7 +378,7 @@ export function renderAgentMemory(params: {
       pageSize: number;
       pageCount: number;
       items: AgentsBrainClawMemoryRecord[];
-    } | null;
+    */
     selectedId: string | null;
     draft: string;
     saving: boolean;
@@ -719,7 +720,7 @@ function renderBrainClawMemoryManager(params: {
   agentMemory: {
     listLoading: boolean;
     listError: string | null;
-    list: {
+    list: AgentsBrainClawMemoryListResult | null; /*
       agentId: string;
       total: number;
       filtered: number;
@@ -729,7 +730,7 @@ function renderBrainClawMemoryManager(params: {
       pageSize: number;
       pageCount: number;
       items: AgentsBrainClawMemoryRecord[];
-    } | null;
+    */
     selectedId: string | null;
     draft: string;
     saving: boolean;
@@ -877,19 +878,35 @@ function renderBrainClawMemoryManager(params: {
         </div>
       </section>
       <div class="stat-grid" style="margin-top: 16px;">
-        <div class="stat" title="Total unique memory items archived for this agent in the canonical PostgreSQL store.">
-          <div class="stat-label">Total</div>
+        <div
+          class="stat"
+          title=${`Unified Memory Index: A combined total of all indexed entities, facts, and chat traces.\n\nBreakdown:\n${Object.entries(
+            list?.breakdown ?? {},
+          )
+            .map(([k, v]) => `• ${k}: ${v}`)
+            .join("\n")}`}
+        >
+          <div class="stat-label">Unified Index</div>
           <div class="stat-value">${list?.total ?? "—"}</div>
         </div>
-        <div class="stat" title="Number of memories matching your current search query, area selection, and confidence threshold.">
+        <div
+          class="stat"
+          title="Number of memories matching your current search query, area selection, and confidence threshold."
+        >
           <div class="stat-label">Filtered</div>
           <div class="stat-value">${list?.filtered ?? "—"}</div>
         </div>
-        <div class="stat" title="High-fidelity synthesized wisdom, facts, and relational items (Long-term memory).">
+        <div
+          class="stat"
+          title="High-fidelity synthesized wisdom, best practices, and relational facts (Long-term memory)."
+        >
           <div class="stat-label">Knowledge</div>
           <div class="stat-value">${list?.knowledge ?? "—"}</div>
         </div>
-        <div class="stat" title="Episodic chat history and session summaries (Short-term memory).">
+        <div
+          class="stat"
+          title="Episodic chat history and session summaries (Short-term memory)."
+        >
           <div class="stat-label">Conversation</div>
           <div class="stat-value">${list?.conversation ?? "—"}</div>
         </div>

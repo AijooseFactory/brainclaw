@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-19
 > Repo branch: `main`
-> Latest commit: `1cde90b`
+> Latest commit: `4eccc20`
 > Live OpenClaw mount: `./brainclaw-sync -> /home/node/.openclaw/extensions/brainclaw`
 
 ## Read This First
@@ -138,6 +138,17 @@ The Python backend lives under `python/openclaw_memory` and currently includes:
 The integration directory (`python/openclaw_memory/integration/`) contains:
 
 - `source_adapter.py`, `artifact_validation.py`, `lcm_migration.py`, `lossless_adapter.py`, `lossless_sync.py`, `memory_backup.py`, `openclaw_client.py`, `operational_memory_sync.py`, `operations.py`, `promotion_override.py`, `session_context.py`, `sync_error_handling.py`.
+
+### Unified Memory Index (v1.5.0-intel)
+
+BrainClaw now provides a **Unified Index** (formerly "Total") which aggregates all canonical memory items in PostgreSQL (760+ items).
+
+- **Granular Breakdown**: Hovering over the index in the BrainClaw Memory tab reveals the exact distribution of memory classes:
+  - `identity`: Agent personas and relationship nodes (500+).
+  - `relational`: Structural facts and graph edges.
+  - `semantic`: Long-term factual knowledge.
+  - `episodic`/`summary`: Short-term chat traces and session context.
+  - `knowledge`: Synthesized wisdom (Phase 12 KIs).
 
 ## Runtime Verification
 
