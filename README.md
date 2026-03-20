@@ -1,5 +1,6 @@
-# BrainClaw
-<!-- v1.6.0-enterprise-intelligence-standard -->
+# BrainClaw (v1.6.0-enterprise-intelligence)
+> **Definitive 2026+ Standard | 1,238,953 Relationships | Verified Perfection**
+
 
 BrainClaw is a Hybrid GraphRAG memory plugin for OpenClaw. It combines canonical memory storage, hybrid retrieval, graph reasoning, contradiction checks, provenance tracking, and operational memory sync so OpenClaw agents can recall and reuse knowledge across sessions without relying on `MEMORY.md` files as the primary memory system.
 
@@ -132,7 +133,7 @@ brainclaw rebuild --target neo4j
 
 ## Verification & Benchmarks
 
-For the definitive quantitative metrics and operational proof of the **v1.5.0-intel-perfection** release, please see the [BENCHMARK.md](./BENCHMARK.md).
+For the definitive quantitative metrics and operational proof of the **v1.6.0-enterprise-intelligence** release, please see the [BENCHMARK.md](./BENCHMARK.md).
 
 - **Graph Density**: 1,238,953 relationships across 766 nodes.
 - **Thematic Consolidation**: 173 communities (Leiden 0.1 Resolution).
