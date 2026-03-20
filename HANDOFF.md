@@ -181,7 +181,7 @@ Verified derived-store state from the same run:
 - Neo4j last validated target state (Stage 6 Perfection 2026+):
   - `entity_count: 766`
   - `relationship_count: 19,427` (Unified via Global Entity Linker 2026+)
-  - `community_count: 424` (Consolidated via Leiden 0.1 Resolution)
+  - `community_count: 173` (Definitive Consolidation via Leiden 0.1)
   - `memory_item_count: 3161` (Total historical memory linked)
   - `heartbeat_contradictions: 0` (Temporal Authority active)
   - `graph_status: healthy` (Perfection Standard achieved)
