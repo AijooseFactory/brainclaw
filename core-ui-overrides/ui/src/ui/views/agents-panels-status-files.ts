@@ -842,8 +842,22 @@ function renderBrainClawMemoryManager(params: {
             </select>
           </label>
           <div class="field">
-            <span>Threshold</span>
-            <div class="input" style="display: flex; align-items: center;">0.60</div>
+            <span>Threshold (${(params.agentMemory as any).threshold ?? 0.60})</span>
+            <input
+              type="range"
+              class="input"
+              min="0"
+              max="1"
+              step="0.01"
+              .value=${String((params.agentMemory as any).threshold ?? 0.60)}
+              @input=${(e: Event) => {
+                const val = parseFloat((e.target as HTMLInputElement).value);
+                (params.agentMemory as any).threshold = val;
+                // Force a refresh of the UI component
+                (e.target as any).closest(".stat-grid")?.parentElement?.dispatchEvent(new CustomEvent("request-update", { bubbles: true }));
+                params.onBrainClawMemoryRefresh(1);
+              }}
+            />
           </div>
         </div>
         <div class="row" style="justify-content: space-between; margin-top: 12px; gap: 12px;">
@@ -879,7 +893,7 @@ function renderBrainClawMemoryManager(params: {
       <div class="stat-grid" style="margin-top: 16px;">
         <div
           class="stat"
-          title="BrainClaw Memory: Total Unified HybridGraph memory items indexed for this agent."
+          title="BrainClaw Memory: Total Unified HybridGraph memory items indexed for this agent. (Note: Communities = 0 — Leiden community detection not yet activated. This was identified as a P1 improvement opportunity in recent research.)"
         >
           <div class="stat-label">BrainClaw Memory</div>
           <div class="stat-value">${list?.total ?? "—"}</div>
