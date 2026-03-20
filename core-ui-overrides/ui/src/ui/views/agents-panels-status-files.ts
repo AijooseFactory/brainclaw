@@ -869,7 +869,6 @@ function renderBrainClawMemoryManager(params: {
                 params.onBrainClawMemoryClassChange("all");
                 params.onBrainClawMemoryLimitChange(25);
                 params.onBrainClawMemoryIncludeSupersededChange(false);
-                params.onBrainClawMemoryRefresh(1);
               }}
             >
               Clear
@@ -880,48 +879,43 @@ function renderBrainClawMemoryManager(params: {
       <div class="stat-grid" style="margin-top: 16px;">
         <div
           class="stat"
-          title=${`Unified Memory Index: A combined total of ALL items archived for this agent (personae, facts, and chat traces).\n\nBreakdown by Memory Class:\n${Object.entries(
-            list?.breakdown ?? {},
-          )
-            .map(([k, v]) => `• ${k}: ${v}`)
-            .join("\n")}`}
+          title="BrainClaw Memory: Total Unified HybridGraph memory items indexed for this agent."
         >
-          <div class="stat-label">Unified Index</div>
+          <div class="stat-label">BrainClaw Memory</div>
           <div class="stat-value">${list?.total ?? "—"}</div>
         </div>
         <div
           class="stat"
-          title="Filtered View: Total items matching your current search criteria (Query, Area, Confidence, etc.)."
+          title="Lossless Memories: Memory items detected or captured in the current session context that match your filters."
         >
-          <div class="stat-label">Filtered</div>
+          <div class="stat-label">Lossless Memories</div>
           <div class="stat-value">${list?.filtered ?? "—"}</div>
         </div>
         <div
           class="stat"
-          title="Synthesized Wisdom (Knowledge): Total high-fidelity agent-wide artifacts like Best Practices, Relationships, and Facts. This is the core 'Wisdom' of your agent across all sessions."
+          title="Agent's Knowledge: Total factual wisdom, best practices, and identity items synthesized by the agent."
         >
-          <div class="stat-label">Knowledge</div>
+          <div class="stat-label">Agent's Knowledge</div>
           <div class="stat-value">${list?.knowledge ?? "—"}</div>
         </div>
         <div
           class="stat"
-          title="Conversation History (Traces): Total agent-wide episodic chat messages and session summaries. These are the short-term 'Tracks' left by your agent across all sessions."
+          title="Self-learning Entries: Total episodic chat messages and session traces captured by the agent."
         >
-          <div class="stat-label">Conversations</div>
+          <div class="stat-label">Self-learning Entries</div>
           <div class="stat-value">${list?.conversation ?? "—"}</div>
         </div>
       </div>
-      ${
-        !list
-          ? html`
-              <div class="callout info" style="margin-top: 16px;">
-                Load BrainClaw memory to browse and edit canonical memory items for this agent.
-              </div>
-            `
-          : html`
-              <div
-                style="display: grid; grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.2fr); gap: 16px; margin-top: 16px;"
-              >
+      ${!list
+        ? html`
+            <div class="callout info" style="margin-top: 16px;">
+              Load BrainClaw memory to browse and edit canonical memory items for this agent.
+            </div>
+          `
+        : html`
+            <div
+              style="display: grid; grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.2fr); gap: 16px; margin-top: 16px;"
+            >
                 <section class="card" style="margin: 0;">
                   <div class="row" style="justify-content: space-between;">
                     <div>
