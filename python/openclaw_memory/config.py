@@ -276,6 +276,11 @@ class LearningConfig:
     confidence_decay_rate: float = 0.001
     min_confidence: float = 0.1
     max_confidence: float = 1.0
+    
+    # Phase 12: Continual Intelligence settings
+    knowledge_boost: float = 1.8  # Reranking boost for Knowledge Items (KIs)
+    distillation_lazy_threshold: int = 50  # Number of promoted memories to trigger distillation
+    distillation_cooldown_hours: int = 4
 
 
 @dataclass

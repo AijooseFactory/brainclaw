@@ -309,12 +309,18 @@ def rerank_results(
         if "recency" in normalized_weights:
             score += result.recency * normalized_weights["recency"]
         
-        # Apply graph_distance weight (lower is better, so inverse)
-        if "graph_distance" in normalized_weights and result.graph_distance is not None:
             # Invert: closer nodes (lower distance) should rank higher
             distance_score = max(0, 1.0 - result.graph_distance)
             score += distance_score * normalized_weights["graph_distance"]
         
+        # Phase 12: Continual Intelligence Boost
+        # Knowledge Items (KIs) represent high-fidelity synthesized wisdom.
+        # We apply a configurable boost to ensure they anchor the context.
+        from ..config import OpenClawMemoryConfig
+        config = OpenClawMemoryConfig.from_env()
+        if result.source == 'knowledge' or result.metadata.get('memory_class') == 'knowledge':
+            score *= getattr(config.learning, 'knowledge_boost', 1.8)
+
         result.metadata["rerank_score"] = score
         scored_results.append((score, result))
     
@@ -432,7 +438,16 @@ async def retrieve(
                 for r in wv_results
             ]
 
-    # 2. Perfect Fusion (RRF with Provenance)
+    # 1a. Knowledge Item Retrieval (Phase 12: Continual Intelligence)
+    # KIs are high-fidelity synthesized wisdom that should anchor the context.
+    ki_results = await query_knowledge_items(query, tenant_id, limit=3)
+    if ki_results:
+        results_by_source["knowledge"] = [
+            {**_normalize_result(r, "knowledge").to_dict(), "source": "knowledge"}
+            for r in ki_results
+        ]
+
+    # 2. Perfect Fusion (RRF with Raw Provenance)
     active_sources = [s for s, r in results_by_source.items() if r]
     
     if len(active_sources) >= 2:
@@ -473,17 +488,12 @@ async def retrieve(
 
 async def query_neo4j_communities(query: str, tenant_id: str, limit: int) -> List[Dict[str, Any]]:
     """Retrieve community summaries from Neo4j based on query relevance."""
-    # This queries the 'Community' nodes which store LLM-generated summaries
     cypher = """
     MATCH (c:Community {tenant_id: $tid})
     WHERE c.summary CONTAINS $query OR c.title CONTAINS $query
     RETURN c.id as id, c.summary as content, c.title as title, 'neo4j_communities' as source, 1.0 as relevance
     LIMIT $limit
     """
-    # Note: In a production 'Perfect' version, we would use vector search on summaries
-    from ..storage.neo4j_client import Neo4jClient
-    # client = ... (acquired from ResultFusion instance)
-    # For now, use the singleton/placeholder pattern already established in this file
     return await query_neo4j(cypher, tenant_id, {"query": query, "limit": limit})
 
 
@@ -496,6 +506,45 @@ async def query_neo4j_entities(query: str, tenant_id: str, limit: int) -> List[D
     LIMIT $limit
     """
     return await query_neo4j(cypher, tenant_id, {"query": query, "limit": limit})
+
+
+async def query_knowledge_items(query: str, tenant_id: str, limit: int) -> List[Dict[str, Any]]:
+    """Retrieve high-fidelity Knowledge Items (KIs) from Postgres."""
+    # This queries the 'knowledge' memory class for synthesized wisdom
+    sql = """
+        SELECT id, content, memory_class, confidence, created_at, metadata
+        FROM memory_items
+        WHERE memory_class = 'knowledge'
+          AND (content ILIKE $1 OR metadata->>'title' ILIKE $1)
+        ORDER BY confidence DESC, created_at DESC
+        LIMIT $2
+    """
+    return await query_postgres_raw(sql, [f"%{query}%", limit])
+
+
+async def query_postgres_raw(sql: str, params: List[Any]) -> List[Dict[str, Any]]:
+    """Helper for raw postgres queries in fusion."""
+    from ..storage.postgres import PostgresClient
+    from ..config import OpenClawMemoryConfig
+    
+    config = OpenClawMemoryConfig.from_env()
+    client = PostgresClient(
+        host=config.postgres.host,
+        port=config.postgres.port,
+        database=config.postgres.database,
+        user=config.postgres.user,
+        password=config.postgres.password
+    )
+    
+    await client.connect()
+    try:
+        results = await client.query(sql, params)
+        return [dict(row) for row in results] if results else []
+    except Exception as e:
+        logger.error("Raw postgres query failed: %s", e)
+        return []
+    finally:
+        await client.disconnect()
 
 
 async def _generate_neo4j_query(

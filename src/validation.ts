@@ -77,6 +77,8 @@ const ALLOWED_ROUTING: Record<string, string[]> = {
     'lcm_sync',
     'lcm_rebuild',
     'sync_operational_memory_files',
+    'intel_distill',
+    'intel_record_promotion',
   ],
   'graph.health': ['get_health_stats'],
   'graph.communities': ['detect_communities'],

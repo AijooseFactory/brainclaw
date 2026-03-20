@@ -17,6 +17,8 @@ import { registerAgentEndCaptureHook } from "./hooks/agent_end_capture.js";
 import { registerLcmExpandTool } from "./tools/lcm_expand.js";
 import { registerLcmDescribeTool } from "./tools/lcm_describe.js";
 import { registerLeidenDetectionTool } from "./tools/leiden_detection.js";
+import { registerIntelDistillTool } from "./tools/intel_distill.js";
+import { registerIntelligenceService } from "./services/intelligence.js";
 import { initLogger } from "./logging.js";
 import { BRAINCLAW_FEATURES, BRAINCLAW_VERSION } from "./plugin_metadata.js";
 import { registerBrainclawCli } from "./register_cli.js";
@@ -50,6 +52,7 @@ export default function hybridGraphRagPlugin(api: any) {
   registerLcmExpandTool(api);
   registerLcmDescribeTool(api);
   registerLeidenDetectionTool(api);
+  registerIntelDistillTool(api);
 
   // 2. Register Background Services
   registerSummarizerService(api);
@@ -59,6 +62,7 @@ export default function hybridGraphRagPlugin(api: any) {
   registerLosslessClawIntegrationService(api);
   registerOperationalMemorySyncService(api);
   registerMemoryFileWatcherService(api);
+  registerIntelligenceService(api);
   registerBrainclawCli(api);
 
   logger.info('plugin', 'init', 'BrainClaw plugin initialized successfully', {

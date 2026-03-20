@@ -2337,6 +2337,81 @@ def get_graph_health(tenant_id: str = "", **kwargs) -> dict:
         return {"error": str(e)}
 
 
+def intel_distill(tenant_id: str = "", **kwargs) -> dict:
+    """Run knowledge distillation for a tenant."""
+    try:
+        from openclaw_memory.security.access_control import get_current_tenant_id
+        tid = tenant_id or get_current_tenant_id()
+
+        async def _run():
+            from openclaw_memory.storage.postgres import PostgresClient
+            from openclaw_memory.storage.neo4j_client import Neo4jClient
+            from openclaw_memory.learning.distiller import KnowledgeDistiller
+            from openclaw_memory.config import OpenClawMemoryConfig
+
+            config = OpenClawMemoryConfig.from_env()
+            postgres = PostgresClient(
+                host=config.postgres.host,
+                port=config.postgres.port,
+                database=config.postgres.database,
+                user=config.postgres.user,
+                password=config.postgres.password
+            )
+            neo4j = Neo4jClient(
+                uri=config.neo4j.uri,
+                user=config.neo4j.user,
+                password=config.neo4j.password,
+                database=config.neo4j.database
+            )
+            
+            # Use Ollama as LLM Client for distillation (local fallback)
+            from openclaw_memory.llm.ollama_client import OllamaClient
+            llm = OllamaClient(base_url=config.llm.ollama_base_url, model=config.llm.summarization_model)
+            
+            distiller = KnowledgeDistiller(
+                postgres=postgres,
+                neo4j=neo4j,
+                llm_client=llm,
+                lazy_threshold=config.learning.distillation_lazy_threshold,
+                cooldown_hours=config.learning.distillation_cooldown_hours
+            )
+
+            await postgres.connect()
+            await neo4j.connect()
+            try:
+                kis = await distiller.distill(tid)
+                return {
+                    "status": "ok",
+                    "distilled_count": len(kis),
+                    "items": [{"id": str(k.id), "content": k.content} for k in kis]
+                }
+            finally:
+                await postgres.disconnect()
+                await neo4j.disconnect()
+
+        return _run_async(_run())
+    except Exception as e:
+        logger.error("Intelligence distillation failed: %s", e)
+        return {"error": str(e)}
+
+
+def intel_record_promotion(count: int = 1, **kwargs) -> dict:
+    """Record memory promotions to trigger lazy distillation later."""
+    try:
+        from openclaw_memory.learning.distiller import KnowledgeDistiller
+        from openclaw_memory.storage.postgres import PostgresClient
+        from openclaw_memory.storage.neo4j_client import Neo4jClient
+        
+        # We only need the state part, but KnowledgeDistiller manages it
+        distiller = KnowledgeDistiller(None, None, None) 
+        _run_async(distiller.record_promotion(count))
+        
+        return {"status": "ok", "recorded": count}
+    except Exception as e:
+        logger.error("Recording promotion failed: %s", e)
+        return {"error": str(e)}
+
+
 if __name__ == "__main__":
     import sys
     import json
@@ -2367,6 +2442,8 @@ if __name__ == "__main__":
         "lcm_expand": lcm_expand,
         "lcm_describe": lcm_describe,
         "classify": classify,
+        "intel_distill": intel_distill,
+        "intel_record_promotion": intel_record_promotion,
     }
 
     if func_name in dispatch:
