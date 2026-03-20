@@ -245,45 +245,56 @@ async def sync_memory_item(
         memory_item_id=str(memory_item.id),
     )
     
-    # Sync to Weaviate
-    if memory_item.content_embedding:
-        for attempt in range(max_retries):
-            try:
-                wv_result = await sync_to_weaviate(
-                    weaviate_client,
-                    [memory_item],
-                )
-                
-                if wv_result and wv_result.get("synced_count", 0) > 0:
-                    status.weaviate_id = wv_result["ids"][0]
-                    status.weaviate_synced = True
-                    status.weaviate_synced_at = datetime.utcnow()
-                    break
-                    
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    status.error = f"Weaviate sync failed: {e}"
-                logger.warning(f"Weaviate sync attempt {attempt + 1} failed: {e}")
+    # Sync to Weaviate and Neo4j in parallel to reduce indexing latency
+    sync_tasks = []
     
-    # Sync to Neo4j
+    # Weaviate Task
+    if memory_item.content_embedding:
+        async def sync_weaviate_with_retries():
+            for attempt in range(max_retries):
+                try:
+                    wv_result = await sync_to_weaviate(weaviate_client, [memory_item])
+                    if wv_result and wv_result.get("synced_count", 0) > 0:
+                        return wv_result["ids"][0]
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        logger.error(f"Weaviate sync final failure: {e}")
+                    logger.warning(f"Weaviate sync attempt {attempt + 1} failed: {e}")
+            return None
+        
+        sync_tasks.append(sync_weaviate_with_retries())
+    else:
+        sync_tasks.append(asyncio.sleep(0, result=None)) # Placeholder
+
+    # Neo4j Task
     if entities or relationships:
-        for attempt in range(max_retries):
-            try:
-                neo4j_result = await sync_to_neo4j(
-                    neo4j_client,
-                    entities,
-                    relationships,
-                )
-                
-                if neo4j_result and neo4j_result.get("synced_count", 0) > 0:
-                    status.neo4j_synced = True
-                    status.neo4j_synced_at = datetime.utcnow()
-                    break
-                    
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    status.error = f"Neo4j sync failed: {e}"
-                logger.warning(f"Neo4j sync attempt {attempt + 1} failed: {e}")
+        async def sync_neo4j_with_retries():
+            for attempt in range(max_retries):
+                try:
+                    neo4j_result = await sync_to_neo4j(neo4j_client, entities, relationships)
+                    if neo4j_result and neo4j_result.get("synced_count", 0) > 0:
+                        return True
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        logger.error(f"Neo4j sync final failure: {e}")
+                    logger.warning(f"Neo4j sync attempt {attempt + 1} failed: {e}")
+            return False
+        
+        sync_tasks.append(sync_neo4j_with_retries())
+    else:
+        sync_tasks.append(asyncio.sleep(0, result=False)) # Placeholder
+
+    # Run tasks in parallel
+    wv_id, neo_synced = await asyncio.gather(*sync_tasks)
+    
+    if wv_id:
+        status.weaviate_id = wv_id
+        status.weaviate_synced = True
+        status.weaviate_synced_at = datetime.utcnow()
+    
+    if neo_synced:
+        status.neo4j_synced = True
+        status.neo4j_synced_at = datetime.utcnow()
     
     # Update sync status in PostgreSQL
     await postgres_client.update_sync_status(

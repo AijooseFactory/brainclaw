@@ -53,7 +53,7 @@ class Entity:
     
     def __post_init__(self):
         if not self.canonical_name and self.name:
-            self.canonical_name = self.name.lower().strip()
+            self.canonical_name = self.name.lower().strip().replace(" ", "-")
 
 
 @dataclass
@@ -562,8 +562,9 @@ def extract_relationships(text: str, entities: Optional[List[Entity]] = None) ->
             match.group(0),
         )
 
+    # integrates_with pattern
     integrates_pattern = re.compile(
-        r'([A-Za-z][A-Za-z0-9_-]*(?:\s+[A-Za-z][A-Za-z0-9_-]*)?)\s+(?:integrates?\s+with|works?\s+with|paired\s+with)\s+([A-Za-z][A-Za-z0-9_-]*(?:\s+[A-Za-z][A-Za-z0-9_-]*)?)',
+        r'([A-Za-z0-9_-]+(?:\s+[A-Za-z0-9_-]+)*)\s+(?:integrates?\s+with|works?\s+with|paired\s+with)\s+([A-Za-z0-9_-]+(?:\s+[A-Za-z0-9_-]+)*)',
         re.IGNORECASE,
     )
     for match in integrates_pattern.finditer(text):
@@ -572,6 +573,34 @@ def extract_relationships(text: str, entities: Optional[List[Entity]] = None) ->
             match.group(2).strip(),
             "collaborates_with",
             0.76,
+            match.group(0),
+        )
+
+    # implements pattern: "X implements Y"
+    implements_pattern = re.compile(
+        r'([A-Za-z0-9_-]+(?:\s+[A-Za-z0-9_-]+)*)\s+(?:implements?|implementing)\s+([A-Za-z0-9_-]+(?:\s+[A-Za-z0-9_-]+)*)',
+        re.IGNORECASE,
+    )
+    for match in implements_pattern.finditer(text):
+        append_relationship(
+            match.group(1).strip(),
+            match.group(2).strip(),
+            "implements",
+            0.85,
+            match.group(0),
+        )
+
+    # part_of pattern: "X is part of Y"
+    part_of_pattern = re.compile(
+        r'([A-Za-z0-9_-]+(?:\s+[A-Za-z0-9_-]+)*)\s+is\s+part\s+of\s+([A-Za-z0-9_-]+(?:\s+[A-Za-z0-9_-]+)*)',
+        re.IGNORECASE,
+    )
+    for match in part_of_pattern.finditer(text):
+        append_relationship(
+            match.group(1).strip(),
+            match.group(2).strip(),
+            "part_of",
+            0.8,
             match.group(0),
         )
 
