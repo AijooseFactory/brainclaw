@@ -930,13 +930,13 @@ function renderBrainClawMemoryManager(params: {
             <div
               style="display: grid; grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.2fr); gap: 16px; margin-top: 16px;"
             >
-                <section class="card" style="margin: 0;">
-                  <div class="row" style="justify-content: space-between;">
+                <section class="card" style="margin: 0; padding: 16px;">
+                  <div style="display: flex; flex-direction: column; gap: 12px;">
                     <div>
-                      <div class="card-title">Entries</div>
+                      <div class="card-title" style="white-space: nowrap;">Entries</div>
                       <div class="card-sub">Canonical BrainClaw memory items for this agent.</div>
                     </div>
-                    <div class="row" style="gap: 8px; align-items: center;">
+                    <div class="row" style="gap: 8px; align-items: center; justify-content: flex-start;">
                       <button
                         class="btn btn--sm"
                         ?disabled=${page <= 1 || params.agentMemory.listLoading}
@@ -944,7 +944,7 @@ function renderBrainClawMemoryManager(params: {
                       >
                         ${icons.chevronLeft}
                       </button>
-                      <div class="muted">Page ${page} of ${pageCount}</div>
+                      <div class="muted" style="white-space: nowrap;">Page ${page} of ${pageCount}</div>
                       <button
                         class="btn btn--sm"
                         ?disabled=${page >= pageCount || params.agentMemory.listLoading}
