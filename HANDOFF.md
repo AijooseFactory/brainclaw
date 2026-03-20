@@ -144,9 +144,9 @@ BrainClaw provides a definitively reconciled memory dashboard:
 
 - **BrainClaw Memory**: Unified total of all HybridGraph items (e.g., **762**).
 - **Lossless Memories**: Active session context detected via Lossless-Claw (e.g., **9**).
-- **Agent's Knowledge**: Stable archive of synthesized factual wisdom (e.g., **761**).
+- **Knowledgebase**: Stable archive of synthesized factual wisdom (e.g., **761**).
 - **Self-learning Entries**: Stable archive of episodic chat traces (e.g., **1**).
-- **Reconciliation Logic**: BrainClaw Memory = Agent's Knowledge + Self-learning Entries.
+- **Reconciliation Logic**: BrainClaw Memory = Knowledgebase + Self-learning Entries.
 - **Granular Breakdown**: Hovering over BrainClaw Memory reveals the exact distribution (`identity`, `semantic`, `relational`, `knowledge`, `episodic`).
 - **Global Alignment**: "Knowledge" and "Conversation" metrics are now **agent-wide (global)** counts.
 
