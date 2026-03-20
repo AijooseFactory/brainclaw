@@ -1859,11 +1859,10 @@ def list_memories(
         cur.execute(total_query, total_params)
         total = int((cur.fetchone() or {}).get("count") or 0)
 
-        # counts params: filtered needs filter_params, the others just [agent_id]
-        # But wait, psycopg2 doesn't support mixed-count params easily here.
-        # I'll just split it into two queries or use a sub-select.
-        # Using sub-select in counts_query above (line 1827).
-        cur.execute(counts_query, [str(canonical_agent_uuid)] + filter_params)
+        # counts params: filtered sub-select needs filter_params, the others just [agent_id]
+        # order in query: (SELECT COUNT(*) FROM memory_items WHERE agent_id = %s ... AND confidence >= %s)
+        # THEN WHERE agent_id = %s
+        cur.execute(counts_query, filter_params + [str(canonical_agent_uuid)])
         counts = dict(cur.fetchone() or {})
         filtered = int(counts.get("filtered") or 0)
         knowledge = int(counts.get("knowledge") or 0)
