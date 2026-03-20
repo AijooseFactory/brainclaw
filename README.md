@@ -1,4 +1,5 @@
 # BrainClaw
+<!-- v1.6.0-enterprise-intelligence-standard -->
 
 BrainClaw is a Hybrid GraphRAG memory plugin for OpenClaw. It combines canonical memory storage, hybrid retrieval, graph reasoning, contradiction checks, provenance tracking, and operational memory sync so OpenClaw agents can recall and reuse knowledge across sessions without relying on `MEMORY.md` files as the primary memory system.
 

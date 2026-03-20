@@ -1,0 +1,46 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "BrainClaw Hybrid GraphRAG Performance",
+    "tags": ["brainclaw", "graphrag", "perfection"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Graph Density (Edges)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "brainclaw_graph_edges_total"
+          }
+        ]
+      },
+      {
+        "title": "Thematic Consolidation (Communities)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "brainclaw_graph_communities_total"
+          }
+        ]
+      },
+      {
+        "title": "Avg. Sync Latency",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "brainclaw_sync_latency_seconds_sum / brainclaw_sync_latency_seconds_count"
+          }
+        ]
+      },
+      {
+        "title": "Knowledge Contradictions",
+        "type": "alert",
+        "targets": [
+          {
+            "expr": "rate(brainclaw_contradictions_detected_total[5m])"
+          }
+        ]
+      }
+    ]
+  }
+}

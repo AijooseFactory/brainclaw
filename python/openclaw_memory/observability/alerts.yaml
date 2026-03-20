@@ -1,0 +1,20 @@
+groups:
+- name: brainclaw_alerts
+  rules:
+  - alert: HighContradictionRate
+    expr: rate(brainclaw_contradictions_detected_total[10m]) > 0.1
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Knowledge Integrity Alert: High Contradiction Rate"
+      description: "BrainClaw detected multiple contradicting facts in the last 10 minutes. Review the Graph Health panel in the Control UI."
+
+  - alert: HighSyncLatency
+    expr: brainclaw_sync_latency_seconds_sum / brainclaw_sync_latency_seconds_count > 0.8
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Performance Alert: High Sync Latency"
+      description: "Memory synchronization latency is exceeding of 800ms. Check the Postgres/Neo4j load."
