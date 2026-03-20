@@ -1798,7 +1798,6 @@ def list_memories(
             FROM memory_items
             WHERE agent_id::text = %s
             {current_clause}
-              AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'
         """
 
         filter_params = [str(canonical_agent_uuid)]
