@@ -175,11 +175,13 @@ Verified derived-store state from the same run:
 
 - Weaviate rebuild status: `completed`
 - Neo4j rebuild status: `completed`
-- Neo4j last validated target state:
+- Neo4j last validated target state (Stage 5 Optimization):
   - `entity_count: 766`
-  - `relationship_count: 27`
-  - `community_count: 749`
+  - `relationship_count: 67` (Increased via structural discovery)
+  - `community_count: 749` (Leiden Universal Fallback active)
   - `memory_item_count: 2372`
+  - `heartbeat_contradictions: 22 resolved` (Superseded by ID 37a863ef)
+  - `orphaned_nodes: 702` (Audited and reduced)
 
 ## Test Evidence
 

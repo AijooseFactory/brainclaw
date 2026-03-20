@@ -169,6 +169,7 @@ class WritePolicy:
         explicitly_marked: bool = False,
         explicit_remember: bool = False,
         occurrence_count: int = 1,
+        contradiction_detected: bool = False,
     ) -> bool:
         """Determine if content should be promoted to memory.
         
@@ -180,10 +181,16 @@ class WritePolicy:
             explicitly_marked: Whether explicitly marked as important
             explicit_remember: Whether user said "remember this"
             occurrence_count: How many times mentioned
+            contradiction_detected: Whether a contradiction was detected with existing memory
             
         Returns:
             True if should be promoted to active memory
         """
+        # Phase 12 Refinement: Block promotion if contradictions detected (unless user confirmed)
+        if contradiction_detected and not user_confirmed:
+            logger.warning(f"Blocking promotion due to contradiction: {content[:50]}...")
+            return False
+
         # Check never promote first
         if self.should_never_promote(memory_type):
             return False
@@ -454,6 +461,7 @@ class IngestionPipeline:
             user_confirmed=event.metadata.get("user_confirmed", False),
             explicitly_marked=event.metadata.get("explicitly_marked", False),
             explicit_remember="remember this" in event.content.lower(),
+            contradiction_detected=event.metadata.get("contradiction_detected", False),
         )
 
 
