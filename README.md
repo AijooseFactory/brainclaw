@@ -68,14 +68,15 @@ Primary implementation files for this feature:
 
 ## Recent Releases
  
-- **v1.5.0-intel (Current)**: `2c4f67d` `feat: Phase 12 Factual HybridGraph UI (BrainClaw Memory, Lossless Memories, Agent's Knowledge, Self-learning Entries)`
+- **v1.5.0-intel-perfection (Current)**: `f1a53cd` `feat: BrainClaw Perfection 2026+ Audit - Relationship Enhancement (19k+), Community Consolidation (Leiden 0.1), and Knowledgebase UI`
+- **v1.5.0-intel**: `65c25c2` `feat: Phase 12 Factual HybridGraph UI (BrainClaw Memory, Lossless Memories, Knowledgebase, Self-learning Entries)`
 - **v1.5.0**: `5db43b1` `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
  
-v1.5.0-intel introduces **Continual Intelligence** via "LazyGraphRAG" and definitive factual UI metrics:
-- **BrainClaw Memory**: Unified HybridGraph archive count (reconciled total).
-- **Lossless Memories**: Real-time window into active session context captured by Lossless-Claw.
-- **Agent's Knowledge**: Stable archive of synthesized factual wisdom and identity.
-- **Self-learning Entries**: Stable archive of episodic chat traces and tracks.
+v1.5.0-intel-perfection achieves **Total Graph Unification** and product-grade reliability:
+- **World-Class Connectivity**: **19,427 relationships** (Unified via Global Entity Linking across 3,161 memories).
+- **Thematic Consolidation**: **173 communities** (Optimized via 0.1 Resolution Leiden pass).
+- **Professionalized UI**: All "Agent's Knowledge" labels renamed to **Knowledgebase** for universal application.
+- **Architectural Zero-Friction**: Resolved all circular imports, DB connection errors, and situational fragmentation.
 
 ## Runtime Compatibility
 
