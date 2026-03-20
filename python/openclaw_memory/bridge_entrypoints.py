@@ -1823,14 +1823,17 @@ def list_memories(
 
         counts_query = f"""
             SELECT
-                COUNT(*) AS filtered,
+                (SELECT COUNT(*) {filter_query}) AS filtered,
                 COUNT(*) FILTER (
                     WHERE COALESCE(memory_class, 'semantic') NOT IN ('episodic', 'summary')
                 ) AS knowledge,
                 COUNT(*) FILTER (
                     WHERE COALESCE(memory_class, 'semantic') IN ('episodic', 'summary')
                 ) AS conversation
-            {filter_query}
+            FROM memory_items
+            WHERE agent_id::text = %s
+            {"AND is_current = TRUE" if is_current else ""}
+              AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'
         """
         breakdown_query = f"""
             SELECT COALESCE(memory_class, 'semantic') as class, COUNT(*) as count
@@ -1856,7 +1859,11 @@ def list_memories(
         cur.execute(total_query, total_params)
         total = int((cur.fetchone() or {}).get("count") or 0)
 
-        cur.execute(counts_query, filter_params)
+        # counts params: filtered needs filter_params, the others just [agent_id]
+        # But wait, psycopg2 doesn't support mixed-count params easily here.
+        # I'll just split it into two queries or use a sub-select.
+        # Using sub-select in counts_query above (line 1827).
+        cur.execute(counts_query, [str(canonical_agent_uuid)] + filter_params)
         counts = dict(cur.fetchone() or {})
         filtered = int(counts.get("filtered") or 0)
         knowledge = int(counts.get("knowledge") or 0)

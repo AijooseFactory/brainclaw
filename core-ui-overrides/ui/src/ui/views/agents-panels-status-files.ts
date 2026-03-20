@@ -880,7 +880,7 @@ function renderBrainClawMemoryManager(params: {
       <div class="stat-grid" style="margin-top: 16px;">
         <div
           class="stat"
-          title=${`Unified Memory Index: A combined total of all indexed entities, facts, and chat traces.\n\nBreakdown:\n${Object.entries(
+          title=${`Unified Memory Index: A combined total of ALL items archived for this agent (personae, facts, and chat traces).\n\nBreakdown by Memory Class:\n${Object.entries(
             list?.breakdown ?? {},
           )
             .map(([k, v]) => `• ${k}: ${v}`)
@@ -891,21 +891,21 @@ function renderBrainClawMemoryManager(params: {
         </div>
         <div
           class="stat"
-          title="Number of memories matching your current search query, area selection, and confidence threshold."
+          title="Filtered View: Total items matching your current search criteria (Query, Area, Confidence, etc.)."
         >
           <div class="stat-label">Filtered</div>
           <div class="stat-value">${list?.filtered ?? "—"}</div>
         </div>
         <div
           class="stat"
-          title="High-fidelity synthesized wisdom, best practices, and relational facts (Long-term memory)."
+          title="Synthesized Wisdom (Knowledge): Total high-fidelity agent-wide artifacts like Best Practices, Relationships, and Facts. This is the core 'Wisdom' of your agent across all sessions."
         >
           <div class="stat-label">Knowledge</div>
           <div class="stat-value">${list?.knowledge ?? "—"}</div>
         </div>
         <div
           class="stat"
-          title="Episodic chat history and session summaries (Short-term memory)."
+          title="Conversation History (Traces): Total agent-wide episodic chat messages and session summaries. These are the short-term 'Tracks' left by your agent across all sessions."
         >
           <div class="stat-label">Conversation</div>
           <div class="stat-value">${list?.conversation ?? "—"}</div>
