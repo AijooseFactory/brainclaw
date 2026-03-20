@@ -4,7 +4,7 @@ BrainClaw is a Hybrid GraphRAG memory plugin for OpenClaw. It combines canonical
 
 ## Overview
 
-BrainClaw is designed around one authority model:
+BrainClaw is designed around one authority model (see [BENCHMARK.md](./BENCHMARK.md) for verified performance metrics):
 
 - PostgreSQL is the canonical durable memory ledger for BrainClaw's Hybrid GraphRAG memory system
 - Weaviate is a derived semantic retrieval index
