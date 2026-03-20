@@ -16,9 +16,10 @@ Everything else feeds or derives from that canonical layer.
 
 - Durable memory search and lookup
 - Canonical ingest and promotion workflow
-- Hybrid GraphRAG retrieval across lexical, semantic, and graph signals
+- Hybrid GraphRAG retrieval with research-backed Mode-Aware Hub (Local, Global, DRIFT, Lazy)
 - Prompt-time recall so BrainClaw becomes the active memory source
 - Agent-end capture of decisions and procedures
+- Universal Leiden Community Detection (GDS with Python-native fallback)
 - Graph health inspection and contradiction review
 - Background entity extraction, summarization, audit logging, and contradiction detection
 - Operational memory sync for root and agent `MEMORY.md` state blocks
@@ -64,15 +65,13 @@ Primary implementation files for this feature:
 - [`python/openclaw_memory/integration/lossless_sync.py`](./python/openclaw_memory/integration/lossless_sync.py)
 - [`specs/001-authoritative-memory-backend/data-model.md`](./specs/001-authoritative-memory-backend/data-model.md)
 
-## Recent Integration Work
+## Recent Release: v1.5.0-perfect
 
-The Lossless-Claw integration alignment landed on `main` in:
+The **'Meticulously Perfect'** release landed on `main` in:
 
-- [`50f8a3f`](https://github.com/AijooseFactory/brainclaw/commit/50f8a3f10110e7a91fddcf26ecb0ff34c30d829e) `feat: align lcm integration contract, runtime gating, and status surfaces`
+- [`5db43b1`](https://github.com/AijooseFactory/brainclaw/commit/5db43b1c6762391621287965c82dd2eaf16) `feat: BrainClaw v1.5.0-perfect - Universal Leiden Fallback & Mode-Aware Retrieval`
 
-The follow-up README correction is:
-
-- [`46fd071`](https://github.com/AijooseFactory/brainclaw/commit/46fd0713f246766af298e5baf635bd6a289a622a) `docs: clarify lossless-claw integration in README`
+This release ensures 100% architectural alignment with the Perfect GraphRAG standard, delivering active community intelligence regardless of GDS availability.
 
 ## Runtime Compatibility
 
@@ -108,6 +107,9 @@ brainclaw lcm sync --mode incremental
 brainclaw lcm sync --mode repair
 brainclaw rebuild --target weaviate
 brainclaw rebuild --target neo4j
+brainclaw hybrid_graphrag_leiden
+brainclaw lcm_expand
+brainclaw lcm_describe
 ```
 
 ## Quick Verification

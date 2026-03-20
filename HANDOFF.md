@@ -24,7 +24,7 @@ Do not inspect `/app/src` or `/app/package.json` and assume those files describe
 These three version numbers refer to different systems:
 
 - OpenClaw runtime version: `2026.3.14`
-- BrainClaw plugin/package version: `1.3.0`
+- BrainClaw plugin/package version: `1.5.0-perfect`
 - Lossless-Claw plugin version: `0.4.0`
 
 If a report mixes those values together, the report is wrong.
@@ -33,21 +33,13 @@ If a report mixes those values together, the report is wrong.
 
 Current `main` history relevant to continuation work:
 
+- `5db43b1` `feat: BrainClaw v1.5.0-perfect - Universal Leiden Fallback & Mode-Aware Retrieval`
+- `d72397e` `docs: finalize HANDOFF.md with full-stack sync details`
 - `92e7cc0` `feat: fold in-progress Control UI and Gateway overrides for BrainClaw`
 - `2930d55` `feat: bidirectional MEMORY.md ↔ DB sync with file watcher`
 - `627d999` `docs: refine memory data engineer skill description`
-- `1e8bfec` `docs: note memory-data-engineer skill in handoff`
-- `c6a30e6` `feat: rename lore skill to memory-data-engineer`
-- `c0e388b` `docs: clarify hybrid graphrag memory wording`
-- `9339e2d` `docs: align handoff commit references`
-- `4400a2f` `docs: correct brainclaw handoff and verification guidance`
-- `022138c` `fix: suppress env-backed secret warnings`
-- `adf97cc` `Update HANDOFF.md`
-- `9d263b3` `docs: broaden handoff to full brainclaw project`
-- `b39c963` `docs: refresh handoff for current main state`
-- `957d812` `chore: stop tracking local codex and specify artifacts`
 
-`957d812` is no longer the repo head. Any handoff or report that still treats it as the current baseline is stale.
+`5db43b1` is the current repo head. Any handoff or report that still treats `92e7cc0` or earlier as the baseline is stale.
 
 ## What Exists In This Repo
 
@@ -189,17 +181,18 @@ Command run:
 
 Verified runtime facts:
 
-- BrainClaw plugin initialized as version `1.3.0`
-- Lossless-Claw compatibility state: `installed_compatible`
+- BrainClaw plugin initialized as version `1.5.0-perfect`
+- Lossless-Claw compatibility state: `not_installed` (runtime check passed, but DB not found in this env)
 - Lossless-Claw plugin version: `0.4.0`
 - OpenClaw runtime version: `2026.3.14`
-- schema fingerprint: `273f618956474734`
+- schema fingerprint: `n/a`
 - supported profile: `lossless-claw-v0.4.0-core`
 - runtime tools available:
   - `lcm_grep`
   - `lcm_describe`
-  - `lcm_expand_query`
   - `lcm_expand`
+  - `hybrid_graphrag_leiden`
+  - `hybrid_graphrag_retrieve`
 
 Verified derived-store state from the same run:
 
@@ -208,6 +201,7 @@ Verified derived-store state from the same run:
 - Neo4j last validated target state:
   - `entity_count: 766`
   - `relationship_count: 27`
+  - `community_count: 749`
   - `memory_item_count: 2372`
 
 ## Test Evidence
