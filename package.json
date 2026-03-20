@@ -1,6 +1,6 @@
 {
   "name": "brainclaw",
-  "version": "1.5.0-intel-perfection",
+  "version": "1.6.0-enterprise-intelligence",
   "description": "A Hybrid GraphRAG Plugin for OpenClaw",
   "type": "module",
   "openclaw": {
