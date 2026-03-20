@@ -1832,7 +1832,7 @@ def list_memories(
                 ) AS conversation
             FROM memory_items
             WHERE agent_id::text = %s
-            {"AND is_current = TRUE" if is_current else ""}
+            {current_clause}
               AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'
         """
         breakdown_query = f"""

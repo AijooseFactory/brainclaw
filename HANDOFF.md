@@ -1,8 +1,8 @@
 # BrainClaw Handoff
 
-> Last updated: 2026-03-19
+> Last updated: 2026-03-20
 > Repo branch: `main`
-> Latest commit: `4eccc20`
+> Latest commit: `dd33a42`
 > Live OpenClaw mount: `./brainclaw-sync -> /home/node/.openclaw/extensions/brainclaw`
 
 ## Read This First
@@ -31,16 +31,11 @@ If a report mixes those values together, the report is wrong.
 
 ## Git State
 
-Current `main` history relevant to continuation work:
-
+- `dd33a42` `feat: Final UI polish for Unified Index & Global Stats`
 - `1cde90b` `feat: BrainClaw v1.5.0-intel - Continual Intelligence & Knowledge Distillation`
 - `5db43b1` `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
-- `d72397e` `docs: finalize HANDOFF.md with full-stack sync details`
-- `92e7cc0` `feat: fold in-progress Control UI and Gateway overrides for BrainClaw`
-- `2930d55` `feat: bidirectional MEMORY.md ↔ DB sync with file watcher`
-- `627d999` `docs: refine memory data engineer skill description`
 
-`5db43b1` is the current repo head. Any handoff or report that still treats `92e7cc0` or earlier as the baseline is stale.
+`dd33a42` is the current repo head.
 
 ## What Exists In This Repo
 
@@ -143,12 +138,9 @@ The integration directory (`python/openclaw_memory/integration/`) contains:
 
 BrainClaw now provides a **Unified Index** (formerly "Total") which aggregates all canonical memory items in PostgreSQL (760+ items).
 
-- **Granular Breakdown**: Hovering over the index in the BrainClaw Memory tab reveals the exact distribution of memory classes:
-  - `identity`: Agent personas and relationship nodes (500+).
-  - `relational`: Structural facts and graph edges.
-  - `semantic`: Long-term factual knowledge.
-  - `episodic`/`summary`: Short-term chat traces and session context.
-  - `knowledge`: Synthesized wisdom (Phase 12 KIs).
+- **Granular Breakdown**: Hovering over the index in the BrainClaw Memory tab reveals the exact distribution of memory classes (`identity`, `semantic`, `relational`, `knowledge`, `episodic`).
+- **Global Stats**: "Knowledge" and "Conversation" metrics are now **agent-wide (global)** counts, ensuring dashboard stability regardless of search filters.
+- **UI Patching**: Due to cross-project resolution rules in the production container, UI changes are surgically patched into `/app/dist/control-ui/assets/agents-BAnlakjV.js` using the `/tmp/patch_ui.py` script.
 
 ## Runtime Verification
 
