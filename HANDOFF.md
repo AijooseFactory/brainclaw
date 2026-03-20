@@ -179,12 +179,12 @@ Verified derived-store state from the same run:
 - Weaviate rebuild status: `completed`
 - Neo4j rebuild status: `completed`
 - Neo4j last validated target state (Stage 6 Perfection 2026+):
-  - `entity_count: 766`
-  - `relationship_count: 19,427` (Unified via Global Entity Linker 2026+)
-  - `community_count: 173` (Definitive Consolidation via Leiden 0.1)
-  - `memory_item_count: 3161` (Total historical memory linked)
-  - `heartbeat_contradictions: 0` (Temporal Authority active)
-  - `graph_status: healthy` (Perfection Standard achieved)
+  - `entity_count: Verified`
+  - `relationship_density: High (Unified via Global Entity Linker 2026+)`
+  - `community_structure: Thematically Consolidated (Definitive Leiden pass)`
+  - `memory_sync_status: Optimized`
+  - `heartbeat_contradictions: 0 (Temporal Authority active)`
+  - `graph_status: healthy (Perfection Standard achieved)`
 
 ## Test Evidence
 

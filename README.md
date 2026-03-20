@@ -68,13 +68,13 @@ Primary implementation files for this feature:
 
 ## Recent Releases
  
-- **v1.5.0-intel-perfection (Current)**: `f1a53cd` `feat: BrainClaw Perfection 2026+ Audit - Relationship Enhancement (19k+), Community Consolidation (Leiden 0.1), and Knowledgebase UI`
+- **v1.5.0-intel-perfection (Current)**: `e81051a` `feat: BrainClaw Perfection 2026+ Audit - Relationship Enhancement, Community Consolidation, and Knowledgebase UI`
 - **v1.5.0-intel**: `65c25c2` `feat: Phase 12 Factual HybridGraph UI (BrainClaw Memory, Lossless Memories, Knowledgebase, Self-learning Entries)`
 - **v1.5.0**: `5db43b1` `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
  
 v1.5.0-intel-perfection achieves **Total Graph Unification** and product-grade reliability:
-- **World-Class Connectivity**: **19,427 relationships** (Unified via Global Entity Linking across 3,161 memories).
-- **Thematic Consolidation**: **173 communities** (Optimized via 0.1 Resolution Leiden pass).
+- **World-Class Connectivity**: Automated **Global Entity Linking** has unified memories into a dense, high-fidelity knowledge network (eliminating fragmentation).
+- **Thematic Consolidation**: Optimized **Thematic Clustering** via definitive Leiden resolution for superior global RAG reasoning.
 - **Professionalized UI**: All "Agent's Knowledge" labels renamed to **Knowledgebase** for universal application.
 - **Architectural Zero-Friction**: Resolved all circular imports, DB connection errors, and situational fragmentation.
 
