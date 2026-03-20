@@ -809,7 +809,7 @@ function renderBrainClawMemoryManager(params: {
             >
               ${[
                 ["all", "All Areas"],
-                ["knowledge", "Knowledge"],
+                ["knowledge", "Knowledgebase"],
                 ["conversation", "Conversation"],
                 ["identity", "Identity"],
                 ["semantic", "Semantic"],
@@ -907,9 +907,9 @@ function renderBrainClawMemoryManager(params: {
         </div>
         <div
           class="stat"
-          title="Agent's Knowledge: Total factual wisdom, best practices, and identity items synthesized by the agent."
+          title="Knowledgebase: Total factual wisdom, best practices, and identity items synthesized by the agent."
         >
-          <div class="stat-label">Agent's Knowledge</div>
+          <div class="stat-label">Knowledgebase</div>
           <div class="stat-value">${list?.knowledge ?? "—"}</div>
         </div>
         <div

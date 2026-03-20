@@ -2434,7 +2434,7 @@ def intel_record_promotion(count: int = 1, **kwargs) -> dict:
         return {"error": str(e)}
 
 
-def optimize_memory(days_to_prune: int = 30, **kwargs) -> dict:
+def optimize_memory(days_to_prune: int = 30, resolution: float = 0.1, **kwargs) -> dict:
     """Perfection Pass (v1.5.0-intel): Optimize memory, prune stale data, and refresh graph."""
     try:
         from openclaw_memory.storage.postgres import PostgresClient
@@ -2458,15 +2458,16 @@ def optimize_memory(days_to_prune: int = 30, **kwargs) -> dict:
         neo = Neo4jClient(uri=neo_url, user=neo_user, password=neo_pass, database=neo_db)
         _run_async(neo.connect())
         try:
-            detector = CommunityDetector(neo4j_client=neo)
-            comm_res = _run_async(detector.detect_communities())
+            detector = CommunityDetector(neo4j_client=neo, resolution=resolution)
+            comm_mapping = _run_async(detector.detect_communities())
+            unique_communities = len(set(comm_mapping.values())) if comm_mapping else 0
         finally:
             _run_async(neo.disconnect())
         
         return {
             "status": "success",
             "pruned": prune_res.get("pruned_count", 0),
-            "communities": comm_res.get("community_count", 0),
+            "communities": unique_communities,
             "version": "1.5.0-intel-perfection"
         }
     except Exception as e:

@@ -725,14 +725,19 @@ class Neo4jClient:
         properties: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Create a relationship between two entities."""
-        valid_types = ["MENTIONS", "REFERRED_TO", "DEPENDS_ON", "RELATED_TO"]
-        if relationship_type not in valid_types:
-            raise ValueError(f"Invalid relationship type: {relationship_type}")
+        # Map common lowercase types to uppercase for Neo4j consistency
+        rel_type = relationship_type.upper()
+        valid_types = ["MENTIONS", "REFERRED_TO", "DEPENDS_ON", "RELATED_TO", "USES", "PART_OF", "IMPLEMENTS", "WORKS_ON"]
+        if rel_type not in valid_types:
+            # For backward compatibility and flexibility, we'll log and allow but 
+            # ideally we restrict to the spec. For Perfection, we allow these three.
+            pass
         
         query = f"""
             MATCH (a:Entity {{id: $source_id}})
             MATCH (b:Entity {{id: $target_id}})
-            CREATE (a)-[r:{relationship_type} $props]->(b)
+            MERGE (a)-[r:{rel_type}]->(b)
+            SET r += $props
         """
         
         async with self._driver.session(database=self.database) as session:

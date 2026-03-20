@@ -67,9 +67,8 @@ class RelationshipEnhancer:
                                 evidence=sentence.strip()[:100],
                                 properties={"method": "co-occurrence"}
                             ))
-        
         # 3. Agent-Utility linking
-        # If an agent (Albert, Einstein, etc.) is mentioned with a tool or file, link them
+        # If an agent is mentioned with a tool or file, link them
         for entity in entities:
             if entity.entity_type == "agent":
                 for target in entities:

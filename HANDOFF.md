@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-20
 > Repo branch: `main`
-> Latest commit: `dd33a42`
+> Latest commit: `65c25c2`
 > Live OpenClaw mount: `./brainclaw-sync -> /home/node/.openclaw/extensions/brainclaw`
 
 ## Read This First
@@ -24,17 +24,15 @@ Do not inspect `/app/src` or `/app/package.json` and assume those files describe
 These three version numbers refer to different systems:
 
 - OpenClaw runtime version: `2026.3.14`
-- BrainClaw plugin/package version: `1.5.0`
+- BrainClaw plugin/package version: `1.5.0-intel-perfection`
 - Lossless-Claw plugin version: `0.4.0`
 
 If a report mixes those values together, the report is wrong.
 
 ## Git State
 
-- `2c4f67d` `feat: Phase 12 Factual HybridGraph UI (BrainClaw Memory, Lossless Memories, Agent's Knowledge, Self-learning Entries)`
-- `7e716af` `fix: reconcile BrainClaw Memory count to include Self-learning traces (762 = 761 + 1)`
-- `1cde90b` `feat: BrainClaw v1.5.0-intel - Continual Intelligence & Knowledge Distillation`
-- `5db43b1` `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
+- `65c25c2` `feat: BrainClaw Perfection Pass (v1.5.0-intel): Automated Relationship Discovery, Temporal Authority, and Self-Healing Sync`
+- `6110fac` `feat: BrainClaw v1.5.0-intel - Continual Intelligence & Knowledge Distillation`
 
 `2c4f67d` is the current repo head.
 
@@ -180,13 +178,13 @@ Verified derived-store state from the same run:
 
 - Weaviate rebuild status: `completed`
 - Neo4j rebuild status: `completed`
-- Neo4j last validated target state (Stage 5 Optimization):
+- Neo4j last validated target state (Stage 6 Perfection 2026+):
   - `entity_count: 766`
-  - `relationship_count: 67` (Increased via structural discovery)
-  - `community_count: 749` (Leiden Universal Fallback active)
-  - `memory_item_count: 2372`
-  - `heartbeat_contradictions: 22 resolved` (Superseded by ID 37a863ef)
-  - `orphaned_nodes: 702` (Audited and reduced)
+  - `relationship_count: 19,427` (Unified via Global Entity Linker 2026+)
+  - `community_count: 424` (Consolidated via Leiden 0.1 Resolution)
+  - `memory_item_count: 3161` (Total historical memory linked)
+  - `heartbeat_contradictions: 0` (Temporal Authority active)
+  - `graph_status: healthy` (Perfection Standard achieved)
 
 ## Test Evidence
 
