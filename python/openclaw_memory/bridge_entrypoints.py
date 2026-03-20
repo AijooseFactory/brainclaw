@@ -1826,6 +1826,7 @@ def list_memories(
                 (SELECT COUNT(*) {filter_query}) AS filtered,
                 COUNT(*) FILTER (
                     WHERE COALESCE(memory_class, 'semantic') NOT IN ('episodic', 'summary')
+                      AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'
                 ) AS knowledge,
                 COUNT(*) FILTER (
                     WHERE COALESCE(memory_class, 'semantic') IN ('episodic', 'summary')
@@ -1833,7 +1834,6 @@ def list_memories(
             FROM memory_items
             WHERE agent_id::text = %s
             {current_clause}
-              AND COALESCE(metadata->>'backup_kind', '') <> 'memory_md_snapshot'
         """
         breakdown_query = f"""
             SELECT COALESCE(memory_class, 'semantic') as class, COUNT(*) as count
