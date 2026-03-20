@@ -65,13 +65,16 @@ Primary implementation files for this feature:
 - [`python/openclaw_memory/integration/lossless_sync.py`](./python/openclaw_memory/integration/lossless_sync.py)
 - [`specs/001-authoritative-memory-backend/data-model.md`](./specs/001-authoritative-memory-backend/data-model.md)
 
-## Recent Release: v1.5.0
+## Recent Releases
  
-The **v1.5.0** release landed on `main` in:
+- **v1.5.0-intel (Current)**: `2c4f67d` `feat: Phase 12 Factual HybridGraph UI (BrainClaw Memory, Lossless Memories, Agent's Knowledge, Self-learning Entries)`
+- **v1.5.0**: `5db43b1` `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
  
-- [`5db43b1`](https://github.com/AijooseFactory/brainclaw/commit/5db43b1c6762391621287965c82dd2eaf16) `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
- 
-This release ensures architectural alignment with GraphRAG standards, delivering active community intelligence regardless of GDS availability.
+v1.5.0-intel introduces **Continual Intelligence** via "LazyGraphRAG" and definitive factual UI metrics:
+- **BrainClaw Memory**: Unified HybridGraph archive count (reconciled total).
+- **Lossless Memories**: Real-time window into active session context captured by Lossless-Claw.
+- **Agent's Knowledge**: Stable archive of synthesized factual wisdom and identity.
+- **Self-learning Entries**: Stable archive of episodic chat traces and tracks.
 
 ## Runtime Compatibility
 

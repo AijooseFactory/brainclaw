@@ -31,11 +31,12 @@ If a report mixes those values together, the report is wrong.
 
 ## Git State
 
-- `dd33a42` `feat: Final UI polish for Unified Index & Global Stats`
+- `2c4f67d` `feat: Phase 12 Factual HybridGraph UI (BrainClaw Memory, Lossless Memories, Agent's Knowledge, Self-learning Entries)`
+- `7e716af` `fix: reconcile BrainClaw Memory count to include Self-learning traces (762 = 761 + 1)`
 - `1cde90b` `feat: BrainClaw v1.5.0-intel - Continual Intelligence & Knowledge Distillation`
 - `5db43b1` `feat: BrainClaw v1.5.0 - Universal Leiden Fallback & Mode-Aware Retrieval`
 
-`dd33a42` is the current repo head.
+`2c4f67d` is the current repo head.
 
 ## What Exists In This Repo
 
