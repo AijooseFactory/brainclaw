@@ -120,6 +120,23 @@ brainclaw lcm_expand
 brainclaw lcm_describe
 ```
 
+## Testing Harness
+
+The BrainClaw testing harness provides public utilities for generating synthetic data, benchmarking replication, and conducting graph densification experiments.
+
+For full documentation, see [docs/testing-harness.md](./docs/testing-harness.md).
+
+### Quick Example
+
+```python
+from openclaw_memory.testing import generate_synthetic_documents
+```
+
+### Use Cases
+- Benchmark replication of research results
+- Custom integration tests for downstream applications
+- Graph densification experiments to evaluate retrieval performance
+
 ## Quick Verification
 
 On a running OpenClaw install:
