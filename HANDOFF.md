@@ -24,17 +24,18 @@ Do not inspect `/app/src` or `/app/package.json` and assume those files describe
 These three version numbers refer to different systems:
 
 - OpenClaw runtime version: `2026.3.14`
-- BrainClaw plugin/package version: `1.5.0-intel-perfection`
+- BrainClaw plugin/package version: `1.6.0-enterprise-intelligence`
 - Lossless-Claw plugin version: `0.4.0`
 
 If a report mixes those values together, the report is wrong.
 
 ## Git State
 
-- `65c25c2` `feat: BrainClaw Perfection Pass (v1.5.0-intel): Automated Relationship Discovery, Temporal Authority, and Self-Healing Sync`
-- `6110fac` `feat: BrainClaw v1.5.0-intel - Continual Intelligence & Knowledge Distillation`
+- `5aea368` `feat: Open Test Harnesses (BC-007)`
+- `01180e0` `feat: Automated CI Benchmarking (BC-008)`
+- `a993984` `feat: BrainClaw v1.6.0-enterprise-intelligence - DEFINITIVE RELEASE`
 
-`2c4f67d` is the current repo head.
+`5aea368` is the current repo head.
 
 ## What Exists In This Repo
 
@@ -107,7 +108,7 @@ The `sync_memory_md_backup` logic is central to the bridge entrypoints in `pytho
 
 The Python backend lives under `python/openclaw_memory` and currently includes:
 
-**Universal AI Agent Optimizations (v1.5.0-intel):**
+**Universal AI Agent Optimizations (v1.6.0-enterprise-intelligence):**
 - **Parallel Storage Sync**: Neo4j and Weaviate synchronization now run concurrently via `asyncio.gather`, reducing indexing latency by ~40% for all agents.
 - **Enhanced Extraction Density**: New rule-based patterns for `implements` and `part_of` relationships to reduce node isolation (orphans).
 - **Canonical Normalization**: Entities now use hyphenated canonical names for more robust cross-reference matching.
@@ -138,7 +139,7 @@ The integration directory (`python/openclaw_memory/integration/`) contains:
 
 - `source_adapter.py`, `artifact_validation.py`, `lcm_migration.py`, `lossless_adapter.py`, `lossless_sync.py`, `memory_backup.py`, `openclaw_client.py`, `operational_memory_sync.py`, `operations.py`, `promotion_override.py`, `session_context.py`, `sync_error_handling.py`.
 
-### Factual Memory Metrics (v1.5.0-intel)
+### Factual Memory Metrics (v1.6.0-enterprise-intelligence)
 
 BrainClaw provides a definitively reconciled memory dashboard:
 
@@ -160,7 +161,7 @@ Command run:
 
 Verified runtime facts:
 
-- BrainClaw plugin initialized as version `1.5.0`
+- BrainClaw plugin initialized as version `1.6.0`
 - Lossless-Claw compatibility state: `not_installed` (runtime check passed, but DB not found in this env)
 - Lossless-Claw plugin version: `0.4.0`
 - OpenClaw runtime version: `2026.3.14`
