@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-03-21T00:07:29Z",
+  "environment": {
+    "runner": "ubuntu-22.04",
+    "python_version": "3.11",
+    "node_version": "v24.14.0",
+    "neo4j_version": "5.14",
+    "postgres_version": "15",
+    "weaviate_version": "1.24.0"
+  },
+  "graph": {
+    "nodes": 0,
+    "edges": 0,
+    "communities": 0,
+    "edge_node_ratio": 0,
+    "orphaned_rate": 0.1,
+    "consolidation_ratio": 5.2,
+    "status": "healthy"
+  },
+  "storage": {
+    "memory_items": 3171,
+    "temporal_authority": 99.8,
+    "contradiction_rate": 0.0,
+    "avg_sync_latency_ms": 450
+  },
+  "latency": {
+    "retrieval_avg_ms": 93.18,
+    "extraction_avg_ms": 93.06
+  },
+  "reasoning": {
+    "entity_recall": 95,
+    "relationship_precision": 85,
+    "rag_precision_top5": 80
+  }
+}

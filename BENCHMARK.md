@@ -36,3 +36,14 @@ This document provides the exact quantitative metrics for the BrainClaw **Perfec
 
 ---
 *Verified on a production Ai Joose Factory instance for the 2026+ intelligence standard.*
+
+---
+**Benchmark Metadata** (auto-updated via CI)
+| Property | Value |
+|----------|-------|
+| Last Updated | 2026-03-21T00:04Z |
+| CI Runner | ubuntu-22.04 |
+| Python | 3.11 |
+| Node.js | 20 |
+| Neo4j | 5.14 |
+| PostgreSQL | 15 |
